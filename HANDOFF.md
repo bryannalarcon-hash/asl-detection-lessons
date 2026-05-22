@@ -205,15 +205,11 @@ This list is the union of every change after `.scaffold-final-report.md`. Read i
 
 ---
 
-## Production-deploy preconditions (hard requirements)
+## Production-deploy preconditions
 
-Before any non-localhost deploy, set ALL of:
-
-1. **`DEV_TOOLS_ENABLED=0`** (backend env) — disables `POST /api/auth/dev-login` (404s). Default is ON for local.
-2. **`VITE_DEV_TOOLS=0`** (frontend build env) — hides all `[Dev: …]` UI AND drops the dev-account credentials (`DEV_EMAIL`/`DEV_PASSWORD` in `frontend/src/lib/dev-credentials.ts`) from the bundle via Vite `define` + dead-code elimination. If you don't set this, the literal dev password ships in JS and a real `/sign-in` call with it succeeds.
-3. **Don't run `npm run db:seed` against the prod DB** — or, if you must seed a dev account for QA, change `DEV_PASSWORD` in `scripts/seed-dev-user.ts` first and rotate after.
-4. **CORS allow-list** — `backend/src/lib/cors.ts` currently hardcodes `http://localhost:5173`. Add a `CORS_ORIGINS` env-var split-and-trim and assert non-empty when `NODE_ENV=production` before deploying. Without this update the deployed frontend can't reach the API at all (which is failsafe, but break the deploy with a clear error).
-5. **Cookie `secure: true`** — flip `backend/src/lib/session.ts`'s `secure: false` (currently commented as dev-only) when behind HTTPS.
+Now lives in `CLAUDE.md` §"Prod-deploy preconditions" so it's visible
+every session. Summary: `DEV_TOOLS_ENABLED=0`, `VITE_DEV_TOOLS=0`, don't
+seed the prod DB, update CORS allow-list, flip cookie `secure: true`.
 
 ---
 
@@ -284,34 +280,12 @@ Run with: `DATABASE_URL=postgres://asl:asl_dev_only@localhost:5433/asl_pilot npx
 
 ---
 
-## Commit cadence (Bryann preference)
+## Workflow doctrine
 
-**Commit after each change.** The agent (me) decides when within these rules:
-
-- **Major changes commit immediately** — feature adds, schema migrations, security fixes, design overhauls, dependency bumps, anything that touches >5 files or changes user-visible behavior. One concept = one commit.
-- **Minor changes can be batched** — typos, lint nits, comment rewording, tiny refactors. Batch up to ~5 of these in a single "chore: misc cleanups" commit.
-- **Never batch across concerns** — don't combine a feature add with unrelated cleanup, even if both are small.
-- **After a build-then-review swarm**: commit ONLY when the review swarm verdict is green. Mid-swarm = inconsistent state, don't commit.
-- **Never `--no-verify`** — fix the hook failure instead.
-- **Never `--amend`** — always new commits, even after a hook fails.
-
-Commit messages: imperative present tense, <72 char subject, one blank line, body paragraphs describing *why* not *what*. Trailer: `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>` when I authored.
-
----
-
-## Development workflow — swarm pattern (Bryann preference)
-
-For any feature add (not 1-2 line fixes), use a **two-phase agent swarm**:
-
-**Phase A — Build swarm.** Spawn one named coder per concern (backend-coder, frontend-coder, camera-coder, etc.) in a single message, all `run_in_background: true`. Express cross-agent dependencies via SendMessage in each prompt. Pause for user-visible status updates between phases — no silent work.
-
-**Phase B — Review swarm.** After build agents complete, spawn `reviewer` + `security-auditor` + `tester` in parallel. Consolidate findings.
-
-**Loop.** If review flags failures, dispatch a fix swarm targeting only the failures, re-run review. Repeat until the **original user-level acceptance criteria** are met (manual UX walk + Playwright green + curl smoke), not just "agents say done."
-
-Skip the swarm for: 1-2 line fixes, doc edits, config flips.
-
-See `~/.claude/projects/-home-bryann-gauntlet-asl-learning/memory/feedback_swarm_build_then_review.md` for the source memory.
+Workflow doctrine (commit cadence, build-then-review swarm pattern, push
+rules, style invariants, prod-deploy preconditions) lives in `CLAUDE.md`
+at the project root — auto-loaded by Claude Code every session. **Read
+that first.** This file is for codebase-state context only.
 
 ---
 
