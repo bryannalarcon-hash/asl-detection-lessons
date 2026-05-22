@@ -1,0 +1,29 @@
+{
+  "name": "asl-pilot",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Browser-based ASL vocabulary practice — Superbuilders pilot project. See docs/prd-scaffold.md.",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "npm --workspace frontend run dev",
+    "dev:api": "npm --workspace backend run dev",
+    "build": "npm --workspace backend run build && npm --workspace frontend run build",
+    "test": "npm --workspace frontend run test && npx playwright test",
+    "test:unit": "npm --workspace frontend run test",
+    "test:e2e": "npx playwright test",
+    "db:migrate": "npm --workspace backend run db:migrate",
+    "db:seed": "tsx scripts/seed-dev-user.ts",
+    "format": "echo 'no formatter configured yet'",
+    "typecheck": "npm --workspace backend run typecheck && npm --workspace frontend run typecheck"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=20.11.0"
+  }
+}

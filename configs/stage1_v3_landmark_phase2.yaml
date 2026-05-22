@@ -1,0 +1,45 @@
+run_name: stage1_v3_landmark_phase2
+
+data:
+  freihand_root: data/FreiHAND_pub_v2
+  interhand_root: data/interhand
+  crop_size: 224
+  heatmap_size: 56
+  heatmap_sigma: 2.0
+  padding_frac: 0.5
+  jitter_shift: 0.05    # less jitter since Phase 2 uses Net 2's predictions
+  jitter_scale: 0.10
+  jitter_rot: 5.0
+  phase2_bbox_cache: data/cache/net2_predictions.json
+  phase2_mix_prob: 0.5
+
+model:
+  num_keypoints: 21
+  heatmap_channels: 128
+
+loss:
+  awing_alpha: 2.1
+  awing_omega: 14.0
+  awing_epsilon: 1.0
+  awing_theta: 0.5
+  coord_weight: 0.1
+  coord_ramp_epochs: 0   # already ramped in Phase 1
+
+train:
+  batch_size: 128
+  num_workers: 32
+  epochs: 10
+  lr: 1.0e-5
+  lr_min: 1.0e-6
+  warmup_epochs: 0
+  weight_decay: 1.0e-4
+  grad_clip: 1.0
+  ema_decay: 0.9998
+  mixed_precision: true
+  early_stop_patience: 999  # never early stop in phase 2 — short run
+  early_stop_min_delta: 0.001
+  log_every: 50
+  val_every: 1
+  checkpoint_dir: checkpoints/stage1_v3_landmark
+  resume_from: checkpoints/stage1_v3_landmark/best.pt
+  seed: 42

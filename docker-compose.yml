@@ -1,0 +1,44 @@
+# Local development stack for the ASL pilot.
+# Run: docker compose up -d
+# Stop: docker compose down  (data persists in the named volume)
+# Reset: docker compose down -v  (destroys all data)
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: asl-pilot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-asl}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-asl_dev_only}
+      POSTGRES_DB: ${POSTGRES_DB:-asl_pilot}
+    # Bind to localhost only so dev Postgres isn't reachable from coffee-shop LANs etc.
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/db/init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-asl} -d ${POSTGRES_DB:-asl_pilot}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Optional: small DB browser at http://localhost:8088
+  # Comment out the whole service if you don't need it.
+  adminer:
+    image: adminer:4.8.1-standalone
+    container_name: asl-pilot-adminer
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${ADMINER_PORT:-8088}:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+    name: asl_pilot_postgres_data

@@ -1,0 +1,47 @@
+run_name: stage1_v3_detector
+
+data:
+  coco_root: data/coco
+  coco_ann_file: data/coco/annotations/coco_wholebody_train_v1.0.json
+  coco_val_ann_file: data/coco/annotations/coco_wholebody_val_v1.0.json
+  coco_train_images: train2017
+  coco_val_images: train2017
+  freihand_root: data/FreiHAND_pub_v2
+  hagrid_root: data/hagrid
+  input_size: 192
+  padding_frac: 0.5
+  # Pre-decoded letterboxed image cache (built once via scripts/build_net2_cache.py).
+  # DetectorTrainDataset auto-detects per-source caches at {cache_root}/{hagrid,coco}/.
+  cache_root: data/net2_cache
+
+model:
+  n_anchors_per_cell: 3
+  n_aux_kpts: 0
+
+loss:
+  focal_alpha: 0.25
+  focal_gamma: 2.0
+  box_weight: 1.0
+  smoothl1_beta: 0.11
+
+anchors:
+  pos_iou: 0.5
+  neg_iou: 0.4
+
+train:
+  batch_size: 256
+  num_workers: 32
+  epochs: 60
+  lr: 5.0e-4
+  lr_min: 1.0e-5
+  warmup_epochs: 3
+  weight_decay: 1.0e-4
+  grad_clip: 1.0
+  ema_decay: 0.9998
+  mixed_precision: true
+  early_stop_patience: 20
+  early_stop_min_delta: 0.001
+  log_every: 50
+  val_every: 1
+  checkpoint_dir: checkpoints/stage1_v3_detector
+  seed: 42

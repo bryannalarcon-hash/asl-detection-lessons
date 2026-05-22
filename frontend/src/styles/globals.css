@@ -1,0 +1,223 @@
+/* Brand fonts — self-hosted via @fontsource (no Google Fonts dependency) */
+/* Foundry · Aurora typography:
+   - Inter (display) — headlines, section titles, h1-h4
+   - Archivo Black — striped stencil wordmark only
+   - JetBrains Mono — body, captions, eyebrows, footnotes (the default) */
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+@import '@fontsource/inter/800.css';
+@import '@fontsource/inter/900.css';
+@import '@fontsource/archivo-black/400.css';
+@import '@fontsource/jetbrains-mono/400.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ===== Foundry · Aurora brand tokens (HSL triplets for hsl(var(--*)) usage) ===== */
+    /* See design/extracted/design_handoff_asl_pilot/README.md §"Design tokens" */
+
+    /* Backgrounds: deep navy palette — never pure black */
+    --bg: 220 51% 12%;          /* #0f1a2e — page background */
+    --bg-paper: 222 46% 19%;    /* #1a2845 — card / elevated surface */
+    --bg-elev: 222 44% 23%;     /* #213254 — hover / input fill */
+    --bg-deep: 220 56% 9%;      /* #0a1322 — deep wells (progress track) */
+
+    /* Back-compat aliases — point old names at Aurora equivalents */
+    --bg-elevated: 222 46% 19%; /* alias of --bg-paper */
+    --bg-raised: 222 44% 23%;   /* alias of --bg-elev */
+    --bg-deepest: 220 56% 9%;   /* alias of --bg-deep */
+
+    /* Foregrounds */
+    --fg: 216 50% 96%;          /* #f1f5fb — primary text */
+    --fg-muted: 215 19% 65%;    /* #94a3b8 — body text, secondary */
+    --fg-subtle: 215 16% 47%;   /* #64748b — captions, footnotes */
+    --fg-faint: 215 19% 35%;    /* #475569 — disabled, leading numerals */
+
+    /* Lines / borders (kept as alpha-on-fg for the rgba feel) */
+    --border: 216 50% 96%;      /* base hue; opacity applied in utilities */
+    --line: 216 50% 96%;        /* alias for --border */
+    --line-soft: 216 50% 96%;
+    --border-strong: 216 50% 96%;
+    --border-stronger: 216 50% 96%;
+
+    /* Accents — cyan primary */
+    --accent: 187 86% 53%;        /* #22d3ee — cyan, links, focus rings */
+    --accent-deep: 189 92% 36%;   /* #0891b2 — hover variant */
+    --accent-soft: 187 85% 69%;   /* #67e8f9 — light variant */
+    --accent-hover: 189 92% 36%;  /* alias of --accent-deep */
+    --accent-ring: 187 85% 69%;   /* alias of --accent-soft for focus rings */
+
+    /* Cyan back-compat aliases */
+    --accent-cyan: 187 86% 53%;        /* alias of --accent */
+    --accent-cyan-bright: 187 85% 69%; /* alias of --accent-soft */
+
+    /* Violet — gradient terminator */
+    --violet: 258 90% 76%;        /* #a78bfa */
+
+    /* Status */
+    --success: 158 64% 52%;     /* #34d399 */
+    --error: 0 91% 71%;         /* #f87171 */
+    --warning: 43 96% 56%;      /* #fbbf24 */
+
+    /* Status back-compat aliases */
+    --status-ok: 158 64% 52%;   /* alias of --success */
+    --status-warn: 43 96% 56%;  /* alias of --warning */
+
+    /* ===== Aurora-specific compound tokens (raw, not HSL — multi-color values) ===== */
+    --grad-primary: linear-gradient(135deg, #67e8f9 0%, #22d3ee 40%, #a78bfa 100%);
+    --grad-glow-a: radial-gradient(circle, rgba(34, 211, 238, 0.30) 0%, transparent 55%);
+    --grad-glow-b: radial-gradient(circle, rgba(167, 139, 250, 0.22) 0%, transparent 55%);
+    --grad-card: linear-gradient(180deg, rgba(34, 211, 238, 0.06) 0%, rgba(167, 139, 250, 0.04) 100%);
+    --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.5), 0 24px 60px rgba(0, 0, 0, 0.6);
+
+    /* ===== shadcn semantic aliases (point at our brand tokens) ===== */
+    /* shadcn/Base UI components reference these — keep them in HSL space */
+
+    --background: 220 51% 12%;
+    --foreground: 216 50% 96%;
+    --card: 222 46% 19%;
+    --card-foreground: 216 50% 96%;
+    --popover: 222 46% 19%;
+    --popover-foreground: 216 50% 96%;
+    --primary: 187 86% 53%;
+    --primary-foreground: 220 56% 9%;
+    --secondary: 222 46% 19%;
+    --secondary-foreground: 216 50% 96%;
+    --muted: 222 46% 19%;
+    --muted-foreground: 215 19% 65%;
+    --accent-foreground: 216 50% 96%;
+    --destructive: 0 91% 71%;
+    --destructive-foreground: 220 56% 9%;
+    --input: 222 44% 23%;
+    --ring: 187 86% 53%;
+    --radius: 0.75rem;
+  }
+
+  /* We ship dark-mode only in v1 — `.dark` and `:root` get the same tokens */
+  .dark {
+    --background: 220 51% 12%;
+    --foreground: 216 50% 96%;
+    --card: 222 46% 19%;
+    --card-foreground: 216 50% 96%;
+    --popover: 222 46% 19%;
+    --popover-foreground: 216 50% 96%;
+    --primary: 187 86% 53%;
+    --primary-foreground: 220 56% 9%;
+    --secondary: 222 46% 19%;
+    --secondary-foreground: 216 50% 96%;
+    --muted: 222 46% 19%;
+    --muted-foreground: 215 19% 65%;
+    --accent-foreground: 216 50% 96%;
+    --destructive: 0 91% 71%;
+    --destructive-foreground: 220 56% 9%;
+    --input: 222 44% 23%;
+    --ring: 187 86% 53%;
+    --border: 216 50% 96%;
+  }
+
+  * {
+    /* Use border alpha at 14% to match Aurora --line spec */
+    border-color: hsl(var(--border) / 0.14);
+  }
+
+  html {
+    background-color: hsl(var(--bg));
+    @apply font-mono;
+  }
+
+  /*
+   * Foundry · Aurora ambient background.
+   * Dual radial corner glows: cyan from top-right + violet from bottom-left.
+   * The gradient is fixed so scroll doesn't shift it.
+   */
+  body {
+    background: hsl(var(--bg));
+    background-image:
+      radial-gradient(at 100% 0%, rgba(34, 211, 238, 0.10) 0%, transparent 50%),
+      radial-gradient(at 0% 100%, rgba(167, 139, 250, 0.08) 0%, transparent 50%);
+    background-attachment: fixed;
+    color: hsl(var(--fg));
+    font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  code,
+  pre,
+  kbd {
+    font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+  }
+}
+
+@layer utilities {
+  /* Display headings: Inter heavy, tight letter-spacing */
+  .font-display {
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -0.025em;
+    line-height: 1.02;
+  }
+
+  /* Wordmark: Archivo Black, slightly opened tracking */
+  .font-wordmark {
+    font-family: 'Archivo Black', ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: 0.04em;
+  }
+
+  /* Gradient text fill (cyan → violet) */
+  .gradient-text {
+    background: var(--grad-primary);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Gradient surface fill */
+  .gradient-bg {
+    background: var(--grad-primary);
+  }
+
+  /* Striped stencil wordmark — for "ASL PILOT" in the nav */
+  .wordmark-stripe {
+    background: repeating-linear-gradient(
+      180deg,
+      hsl(var(--fg)) 0 18%,
+      transparent 18% 28%,
+      hsl(var(--fg)) 28% 46%,
+      transparent 46% 56%,
+      hsl(var(--fg)) 56% 74%,
+      transparent 74% 84%,
+      hsl(var(--fg)) 84% 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Eyebrow micro-label — mono, uppercase, wide tracking */
+  .eyebrow {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: hsl(var(--fg-muted));
+  }
+
+  /* Primary button styling — gradient face, deep navy text, soft inset sheen */
+  .btn-aurora-primary {
+    background: var(--grad-primary);
+    color: #08101c;
+    font-weight: 600;
+    border: 0;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.18) inset,
+      0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+
+  .btn-aurora-primary:hover {
+    filter: brightness(1.08);
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "ruflo": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "ruflo@3.7.0-alpha.75",
+        "mcp",
+        "start"
+      ],
+      "env": {}
+    }
+  }
+}

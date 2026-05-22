@@ -1,0 +1,37 @@
+run_name: stage1_resume_v1
+
+# This config matches the v1 training exactly so we can resume from v1_best.pt.
+data:
+  coco_root: data/coco
+  coco_ann_file: data/coco/annotations/coco_wholebody_train_v1.0.json
+  coco_val_ann_file: data/coco/annotations/coco_wholebody_val_v1.0.json
+  coco_train_images: train2017
+  coco_val_images: train2017
+  freihand_root: data/FreiHAND_pub_v2
+  image_size: 256
+  heatmap_size: 64
+  heatmap_sigma: 2.0
+  sample_ratio_coco: 0.7
+  sample_ratio_freihand: 0.3
+  flip_prob: 0.5
+  color_jitter: 0.2
+
+model:
+  num_keypoints: 49
+  backbone_channels: [32, 64, 128, 256, 384]
+  heatmap_channels: 256
+
+train:
+  batch_size: 128
+  num_workers: 24
+  epochs: 50
+  lr: 1.0e-3
+  lr_min: 1.0e-4
+  weight_decay: 1.0e-4
+  early_stop_patience: 15
+  early_stop_min_delta: 0.001
+  mixed_precision: true
+  log_every: 50
+  val_every: 1
+  checkpoint_dir: checkpoints/stage1_resumed
+  seed: 42

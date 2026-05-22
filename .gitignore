@@ -1,0 +1,74 @@
+# Python (ML side)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.pytest_cache/
+.venv/
+.venv-*/
+venv/
+env/
+*.egg-info/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Node / build outputs
+node_modules/
+dist/
+build/
+frontend/dist/
+backend/dist/
+*.tsbuildinfo
+
+# ML artifacts
+data/
+checkpoints/
+runs/
+logs/
+wandb/
+*.pth
+*.onnx
+*.safetensors
+ASL_Citizen.zip
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Test outputs
+playwright-report/
+test-results/
+coverage/
+
+# Phase reports (scaffold-time artifacts)
+.scaffold-phase*-report.md
+
+# Local-only generated artifacts (per GITLAB.md "must stay local")
+screenshots/
+design/extracted/
+results/
+playground/
+ruvector.db
+*.db-shm
+*.db-wal
+
+# Local orchestrator state (Claude Code + ruflo + agentic-flow + claude-flow)
+.claude/
+.claude-flow/
+.codex/
+.swarm/
+.ruflo/
+
+# Editor / OS
+*.tmp
+*.bak
