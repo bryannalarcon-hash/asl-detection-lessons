@@ -17,6 +17,9 @@ export interface PracticeContext {
   repIndex: number;
   repsPerDrill: number;
   lastOutcome: 'pass' | 'fail' | 'skip' | null;
+  /** Failures + drill-skips on the current sign. Resets on sign change.
+   *  Drives adaptive hint surfacing (HintButton failCount prop). */
+  signFailCount: number;
 }
 
 export type PracticeEvent =
@@ -66,6 +69,7 @@ export const practiceMachine = setup({
       signIndex: context.signIndex + 1,
       drillIndex: 0,
       repIndex: 0,
+      signFailCount: 0,
     })),
     backDrill: assign(({ context }) => ({
       drillIndex: Math.max(0, context.drillIndex - 1),
@@ -75,10 +79,17 @@ export const practiceMachine = setup({
       signIndex: Math.max(0, context.signIndex - 1),
       drillIndex: 0,
       repIndex: 0,
+      signFailCount: 0,
     })),
     setOutcomePass: assign(() => ({ lastOutcome: 'pass' as const })),
-    setOutcomeFail: assign(() => ({ lastOutcome: 'fail' as const })),
-    setOutcomeSkip: assign(() => ({ lastOutcome: 'skip' as const })),
+    setOutcomeFail: assign(({ context }) => ({
+      lastOutcome: 'fail' as const,
+      signFailCount: context.signFailCount + 1,
+    })),
+    setOutcomeSkip: assign(({ context }) => ({
+      lastOutcome: 'skip' as const,
+      signFailCount: context.signFailCount + 1,
+    })),
     clearOutcome: assign(() => ({ lastOutcome: null })),
   },
 }).createMachine({
@@ -98,6 +109,7 @@ export const practiceMachine = setup({
       repIndex,
       repsPerDrill,
       lastOutcome: null,
+      signFailCount: 0,
     };
   },
   states: {

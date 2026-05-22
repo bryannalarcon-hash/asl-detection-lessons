@@ -35,15 +35,14 @@ function buildEmpty(days = 75): HeatmapCell[] {
   return out;
 }
 
-// Five tiers: 0 = empty deep-well; 1-3 = calibrated GitHub greens (keeps the
-// "more practice = greener" intuition); 4 = the Aurora cyan→violet gradient
-// (signals "you crushed it"). The README explicitly calls for tier-4 to use
-// `var(--grad-primary)` and the cyan ring stays as the today marker.
+// Five tiers in one Aurora family — cyan deepens through tiers 1–3, then the
+// signature cyan→violet gradient lights up tier 4 to signal "you crushed it."
+// Tier 0 is a deep-well surface so empty days disappear into the panel.
 const INTENSITY_CLASS: Record<Intensity, string> = {
   0: 'bg-bg-deep intensity-0',
-  1: 'bg-[#0e4429] intensity-1 ring-1 ring-inset ring-white/[0.03]',
-  2: 'bg-[#006d32] intensity-2 ring-1 ring-inset ring-white/[0.04]',
-  3: 'bg-[#26a641] intensity-3 ring-1 ring-inset ring-white/[0.05]',
+  1: 'bg-accent-deep/30 intensity-1 ring-1 ring-inset ring-white/[0.03]',
+  2: 'bg-accent-deep/60 intensity-2 ring-1 ring-inset ring-white/[0.04]',
+  3: 'bg-accent/80 intensity-3 ring-1 ring-inset ring-white/[0.05]',
   4: 'intensity-4 ring-1 ring-inset ring-white/[0.07] bg-grad-primary',
 };
 

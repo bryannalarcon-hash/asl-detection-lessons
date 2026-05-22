@@ -7,6 +7,7 @@ interface DevPanelProps {
   onSetGreen: () => void;
   onSkipDrill: () => void;
   onAutoPassRep: () => void;
+  onFailRep: () => void;
 }
 
 const BTN =
@@ -18,6 +19,7 @@ export function DevPanel({
   onSetGreen,
   onSkipDrill,
   onAutoPassRep,
+  onFailRep,
 }: DevPanelProps) {
   if (!isDevToolsEnabled()) return null;
 
@@ -91,6 +93,15 @@ export function DevPanel({
           className={BTN}
         >
           Auto-pass rep
+        </button>
+        <button
+          type="button"
+          data-testid="dev-fail-rep"
+          data-dev-override
+          onClick={onFailRep}
+          className={BTN}
+        >
+          Fail rep
         </button>
       </div>
     </aside>

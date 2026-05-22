@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { HelpCircle } from 'lucide-react';
 import {
   Dialog,
@@ -8,38 +8,70 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 import { ReferenceVideo } from './ReferenceVideo';
 
 interface HintButtonProps {
   signSlug: string;
   englishGloss: string;
+  /** Failures + drill-skips on the current sign. Drives the visual urgency:
+   *  0 = quiet, 1 = normal, ≥2 = accent-pulse + sibling caption.
+   *  At ≥3 the dialog auto-opens once per sign. */
+  failCount?: number;
 }
 
-// Single hardcoded fallback hint per PRD §"What to skip vs do".
 const FALLBACK_HINT = 'Try again — focus on the handshape, then trace the movement slowly.';
+const AUTO_OPEN_THRESHOLD = 3;
 
-/**
- * Foundry · Aurora quiet "? Show a hint" trigger. Sits in the bordered hint
- * row between the media cells and the CTA row. Opens a dialog that contains
- * the hint text + the reference video at larger scale.
- */
-export function HintButton({ signSlug, englishGloss }: HintButtonProps) {
+export function HintButton({ signSlug, englishGloss, failCount = 0 }: HintButtonProps) {
   const [open, setOpen] = useState(false);
+  // Track whether we've auto-opened for this sign so we don't re-trigger
+  // every render once the user dismisses the dialog.
+  const autoOpenedForSign = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (failCount >= AUTO_OPEN_THRESHOLD && autoOpenedForSign.current !== signSlug) {
+      autoOpenedForSign.current = signSlug;
+      setOpen(true);
+    }
+    if (failCount === 0) {
+      // Reset memo when the sign resets (new sign or back-sign clears the count).
+      autoOpenedForSign.current = null;
+    }
+  }, [failCount, signSlug]);
+
+  const urgent = failCount >= 2;
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        data-testid="hint-button"
-        className="inline-flex h-8 items-center gap-2 rounded-md border border-transparent bg-transparent px-3 font-mono text-[0.78rem] text-fg-muted transition-[background-color,border-color,color] duration-150 ease-out hover:border-border hover:bg-bg-paper hover:text-fg focus-visible:outline-2 focus-visible:outline-accent-ring focus-visible:outline-offset-2"
-      >
-        <HelpCircle className="h-4 w-4" />
-        Show a hint
-      </DialogTrigger>
-      <DialogContent>
+      <div className="inline-flex flex-col items-start gap-1">
+        <DialogTrigger
+          data-testid="hint-button"
+          data-fail-count={failCount}
+          className={cn(
+            'inline-flex h-8 items-center gap-2 rounded-md border px-3 font-mono text-[0.78rem] transition-[background-color,border-color,color,box-shadow] duration-150 ease-out focus-visible:outline-2 focus-visible:outline-accent-ring focus-visible:outline-offset-2',
+            urgent
+              ? 'animate-pulse border-accent/60 bg-accent/10 text-accent shadow-[0_0_18px_-6px_hsl(var(--accent)/0.6)] hover:bg-accent/20'
+              : 'border-transparent bg-transparent text-fg-muted hover:border-border hover:bg-bg-paper hover:text-fg',
+          )}
+        >
+          <HelpCircle className="h-4 w-4" />
+          {urgent ? 'Stuck? Open hint' : 'Show a hint'}
+        </DialogTrigger>
+        {urgent && (
+          <span
+            data-testid="hint-urgent-caption"
+            className="font-mono text-[0.65rem] uppercase tracking-[0.08em] text-fg-muted"
+          >
+            {failCount} miss{failCount === 1 ? '' : 'es'} this sign — try the hint
+          </span>
+        )}
+      </div>
+      <DialogContent className="max-h-[85vh] w-[min(640px,92vw)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Hint · {englishGloss}</DialogTitle>
           <DialogDescription>{FALLBACK_HINT}</DialogDescription>
         </DialogHeader>
-        <div className="mt-4 h-64">
+        <div className="mt-4 aspect-video w-full">
           <ReferenceVideo signSlug={signSlug} englishGloss={englishGloss} />
         </div>
       </DialogContent>

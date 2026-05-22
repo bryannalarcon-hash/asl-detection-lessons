@@ -60,10 +60,10 @@ export default function LessonIntroPage() {
   };
 
   return (
-    <main data-testid="page-lesson-intro" className="mx-auto max-w-5xl px-6 py-10">
+    <main data-testid="page-lesson-intro" className="mx-auto max-w-5xl px-6 py-6">
       <nav
         aria-label="Breadcrumb"
-        className="mb-6 font-mono text-xs uppercase tracking-[0.12em] text-fg-muted"
+        className="mb-4 font-mono text-xs uppercase tracking-[0.12em] text-fg-muted"
       >
         <Link to="/lessons" className="hover:text-fg">
           Lessons
@@ -72,14 +72,14 @@ export default function LessonIntroPage() {
         <span className="text-fg">{lesson?.title ?? slug}</span>
       </nav>
 
-      <header className="mb-10">
+      <header className="mb-6">
         {lesson ? (
           <>
             <Eyebrow>Lesson № {String(lesson.orderIndex || 0).padStart(2, '0')}</Eyebrow>
-            <h1 className="mt-3 font-display text-4xl font-extrabold leading-[1.02] tracking-tight text-fg md:text-5xl">
+            <h1 className="mt-2 font-display text-3xl font-extrabold leading-[1.02] tracking-tight text-fg md:text-4xl">
               {lesson.title}
             </h1>
-            <p className="mt-4 max-w-2xl font-mono text-sm leading-relaxed text-fg-muted">
+            <p className="mt-2 max-w-2xl font-mono text-sm leading-relaxed text-fg-muted">
               <span className="text-fg">{lesson.signCount}</span> signs · ~
               {lesson.signCount * 3} min · 3 reps each.
             </p>
@@ -87,12 +87,12 @@ export default function LessonIntroPage() {
         ) : (
           <>
             <Eyebrow>Lesson</Eyebrow>
-            <h1 className="mt-3 font-display text-4xl font-extrabold leading-[1.02] tracking-tight text-fg">
+            <h1 className="mt-2 font-display text-3xl font-extrabold leading-[1.02] tracking-tight text-fg md:text-4xl">
               {lessonQuery.isLoading ? 'Loading lesson…' : `Lesson: ${slug}`}
             </h1>
             {!lessonQuery.isLoading && (
               <p
-                className="mt-4 font-mono text-sm text-fg-muted"
+                className="mt-2 font-mono text-sm text-fg-muted"
                 data-testid="lesson-intro-fallback"
               >
                 Backend not reachable. You can still start practice with placeholder signs.
@@ -102,30 +102,30 @@ export default function LessonIntroPage() {
         )}
       </header>
 
-      <div className="grid gap-10 md:grid-cols-[1fr_320px]">
+      <div className="grid gap-6 md:grid-cols-[1fr_320px]">
         {/* Signs list */}
         <section>
           <Eyebrow>§ Signs you'll practice</Eyebrow>
           {signs.length === 0 ? (
             <p className="mt-4 font-mono text-sm text-fg-muted">No signs loaded yet.</p>
           ) : (
-            <ul className="mt-4 flex flex-col">
+            <ul className="mt-3 flex flex-col">
               {signs.map((s, i) => (
                 <li
                   key={s.slug}
                   data-testid="lesson-sign-item"
-                  className="grid grid-cols-[36px_1fr_auto] items-center gap-4 border-b border-line/15 py-3"
+                  className="grid grid-cols-[28px_1fr_auto] items-center gap-3 border-b border-line/15 py-1.5"
                 >
-                  <span className="font-mono text-sm text-fg-faint">
+                  <span className="font-mono text-xs text-fg-faint">
                     {String(i + 1).padStart(2, '0')}
                   </span>
                   <span className="flex items-center gap-3">
-                    <span className="font-display text-base font-medium uppercase text-fg">
+                    <span className="font-display text-sm font-medium uppercase text-fg">
                       {s.englishGloss}
                     </span>
                     <span aria-hidden="true" className="h-px flex-1 bg-line/15" />
                   </span>
-                  <span className="font-mono text-xs uppercase tracking-[0.04em] text-fg-subtle">
+                  <span className="font-mono text-[0.65rem] uppercase tracking-[0.04em] text-fg-subtle">
                     3 reps
                   </span>
                 </li>
@@ -135,10 +135,10 @@ export default function LessonIntroPage() {
         </section>
 
         {/* Practice settings sticky panel */}
-        <aside className="md:sticky md:top-24 md:self-start">
-          <div className="rounded-card border border-line/30 bg-bg-paper p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_1px_2px_rgba(0,0,0,0.4)]">
+        <aside className="md:sticky md:top-20 md:self-start">
+          <div className="rounded-card border border-line/30 bg-bg-paper p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_1px_2px_rgba(0,0,0,0.4)]">
             <Eyebrow>Practice settings</Eyebrow>
-            <div className="mt-4 space-y-4">
+            <div className="mt-3 space-y-3">
               <label
                 htmlFor="camera-toggle"
                 className="flex cursor-pointer items-center gap-3"
@@ -167,19 +167,15 @@ export default function LessonIntroPage() {
                   htmlFor="reference-toggle"
                   className="cursor-pointer font-mono text-sm"
                 >
-                  Show instructor reference video
+                  Show reference video
                 </Label>
               </label>
 
-              <div className="border-t border-line/15 pt-4">
-                <p className="font-mono text-xs leading-relaxed text-fg-subtle">
-                  Hiding the reference tests recall. Turning off the camera switches to
-                  self-report mode — you decide if your sign was correct.
-                </p>
-              </div>
+              <p className="border-t border-line/15 pt-3 font-mono text-[0.7rem] leading-relaxed text-fg-subtle">
+                Hide reference to test recall. Camera off → self-report mode.
+              </p>
 
               <Button
-                size="lg"
                 className="w-full"
                 onClick={handleStart}
                 data-testid="lesson-start"
@@ -196,21 +192,21 @@ export default function LessonIntroPage() {
             </div>
           </div>
 
-          <div className="mt-4 flex justify-between gap-3 px-1 font-mono text-xs">
-            <span className="flex flex-col gap-1">
-              <span className="text-[0.7rem] uppercase tracking-[0.12em] text-fg-muted">
+          <div className="mt-3 flex justify-between gap-3 px-1 font-mono text-xs">
+            <span className="flex flex-col gap-0.5">
+              <span className="text-[0.65rem] uppercase tracking-[0.12em] text-fg-muted">
                 Time
               </span>
               <span className="text-fg">~{(lesson?.signCount ?? 6) * 3} min</span>
             </span>
-            <span className="flex flex-col gap-1">
-              <span className="text-[0.7rem] uppercase tracking-[0.12em] text-fg-muted">
+            <span className="flex flex-col gap-0.5">
+              <span className="text-[0.65rem] uppercase tracking-[0.12em] text-fg-muted">
                 Signs
               </span>
               <span className="text-fg">{lesson?.signCount ?? signs.length}</span>
             </span>
-            <span className="flex flex-col gap-1">
-              <span className="text-[0.7rem] uppercase tracking-[0.12em] text-fg-muted">
+            <span className="flex flex-col gap-0.5">
+              <span className="text-[0.65rem] uppercase tracking-[0.12em] text-fg-muted">
                 Reps each
               </span>
               <span className="text-fg">×3</span>

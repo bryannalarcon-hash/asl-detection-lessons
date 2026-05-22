@@ -29,12 +29,18 @@ export function StreakIndicator({ streak }: StreakIndicatorProps) {
           {days === 1 ? 'day' : 'days'}
         </span>
       </div>
-      {streak.freezesRemaining > 0 && (
-        <span className="mt-2 font-mono text-[0.7rem] text-fg-muted">
-          {streak.freezesRemaining} freeze{streak.freezesRemaining === 1 ? '' : 's'}{' '}
-          available
+      <div
+        data-testid="streak-freezes"
+        className="mt-3 inline-flex items-center gap-2 rounded-full border border-line/40 bg-bg-paper px-2.5 py-1 font-mono text-[0.7rem] uppercase tracking-wider"
+      >
+        <span aria-hidden="true" className="text-accent-soft">
+          ❄
         </span>
-      )}
+        <span className="text-fg">{streak.freezesRemaining}</span>
+        <span className="text-fg-muted">
+          freeze{streak.freezesRemaining === 1 ? '' : 's'}
+        </span>
+      </div>
     </div>
   );
 }

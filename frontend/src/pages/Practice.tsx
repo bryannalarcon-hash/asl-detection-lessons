@@ -339,6 +339,7 @@ export default function PracticePage() {
             <HintButton
               signSlug={currentSign.slug}
               englishGloss={currentSign.englishGloss}
+              failCount={state.context.signFailCount}
             />
             <button
               type="button"
@@ -384,6 +385,7 @@ export default function PracticePage() {
           onSetGreen={() => setBoxState('green')}
           onSkipDrill={() => send({ type: 'SKIP_DRILL' })}
           onAutoPassRep={() => send({ type: 'PASS' })}
+          onFailRep={() => send({ type: 'FAIL' })}
         />
 
         <SignCompleteToast
