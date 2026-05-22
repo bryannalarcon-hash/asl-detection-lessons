@@ -149,21 +149,30 @@ export default function PracticePage() {
 
   const [boxState, setBoxState] = useState<BoxState>('gray');
 
-  // Auto-advance: when the bounding box turns green (CV detected success,
-  // or the dev panel forced it), advance the rep automatically — then
-  // restore the box to orange so the next rep can fire its own green.
+  // Auto-advance: a single green box advances exactly one rep, then drops
+  // back to orange. The next rep needs its own green trigger — the box must
+  // leave green and re-enter green before another PASS fires. Without the
+  // ref-guard, the fast-forward effect can chain through several SELF_REPORT
+  // entries while boxState is still 'green' and rip through the whole lesson.
+  const greenFiredRef = useRef(false);
   useEffect(() => {
-    if (boxState !== 'green') return;
+    if (boxState !== 'green') {
+      // Reset the latch so the next green can fire.
+      greenFiredRef.current = false;
+      return;
+    }
+    if (greenFiredRef.current) return;
     if (state.matches('SELF_REPORT')) {
-      const advanceTimer = window.setTimeout(() => {
+      greenFiredRef.current = true;
+      const t = window.setTimeout(() => {
+        // Flip the box BEFORE sending PASS so the post-advance SELF_REPORT
+        // re-render doesn't see a still-green box and chain-fire.
+        setBoxState('orange');
         send({ type: 'PASS' });
       }, 350);
-      const restoreTimer = window.setTimeout(() => setBoxState('orange'), 700);
-      return () => {
-        window.clearTimeout(advanceTimer);
-        window.clearTimeout(restoreTimer);
-      };
+      return () => window.clearTimeout(t);
     }
+    // Green outside SELF_REPORT (between reps) — just flash back to orange.
     const t = window.setTimeout(() => setBoxState('orange'), 600);
     return () => window.clearTimeout(t);
   }, [boxState, state, send]);
