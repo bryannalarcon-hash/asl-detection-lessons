@@ -63,7 +63,7 @@ fi
 
 # --- Search offers. -------------------------------------------------------
 echo "[2/8] searching offers (RTX 5090, >=200 GB, reliability2>=0.98, Utah/US pref)"
-OFFER_QUERY='gpu_name=RTX_5090 disk_space>=200 reliability2>=0.98 rentable=true verified=true'
+OFFER_QUERY='gpu_name=RTX_5090 disk_space>=200 reliability>0.99 rentable=true verified=true'
 # vast search occasionally returns empty under transient rate limits;
 # retry up to 5 times with backoff.
 OFFER_ID=""
