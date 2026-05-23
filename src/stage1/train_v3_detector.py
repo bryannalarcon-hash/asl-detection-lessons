@@ -265,13 +265,18 @@ def main() -> None:
             print("[warn] data.target_mix set but --data-limit overrides it; "
                   "using sequential subset instead.")
 
+        # persistent_workers=False + timeout=60 to prevent the dataloader
+        # deadlocks observed in Stage B (workers accumulate state across
+        # epochs and the mix of mmap caches + WeightedRandomSampler eventually
+        # stalls; respawning each epoch eliminates the accumulation).
         loader = DataLoader(
             train_ds, batch_size=deep_get(cfg, "train.batch_size"),
             shuffle=shuffle_flag, sampler=sampler,
             num_workers=deep_get(cfg, "train.num_workers"),
             pin_memory=True, drop_last=True, collate_fn=detector_collate,
-            persistent_workers=deep_get(cfg, "train.num_workers") > 0,
+            persistent_workers=False,
             prefetch_factor=4 if deep_get(cfg, "train.num_workers") > 0 else None,
+            timeout=60 if deep_get(cfg, "train.num_workers") > 0 else 0,
         )
         steps_per_epoch = None  # iter-defined
 
