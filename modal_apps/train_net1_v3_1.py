@@ -107,11 +107,10 @@ def train():
 
     mpii_cache_ok = (cache_root / "mpii_train" / "meta.json").exists()
     if not mpii_cache_ok:
-        print("[modal] building MPII preprocess cache...", flush=True)
+        print("[modal] building preprocess cache (coco + mpii)...", flush=True)
         subprocess.run(
             ["python", "scripts/preprocess_cache.py",
              "--config", "configs/stage1_v2_facebody_v3_1.yaml",
-             "--sources", "mpii",
              "--out", str(cache_root),
              "--cache-size", "256"],
             check=True,

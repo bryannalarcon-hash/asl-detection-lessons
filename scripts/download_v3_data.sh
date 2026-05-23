@@ -192,7 +192,8 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "=== EgoHands (Roboflow YOLO mirror) ==="
-bash "$SCRIPT_DIR/download_egohands.sh"
+bash "$SCRIPT_DIR/download_egohands.sh" || \
+    echo "[warn] EgoHands download failed; v3.1 mix sampler will renormalize without egohands. Continuing."
 
 echo "=== MPII Human Pose v1.0 ==="
 bash "$SCRIPT_DIR/download_mpii.sh"
