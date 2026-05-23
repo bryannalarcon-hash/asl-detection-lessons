@@ -191,9 +191,9 @@ fi
 # We invoke them unconditionally and rely on `set -e` to surface real failures.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-echo "=== EgoHands (Roboflow YOLO mirror) ==="
-bash "$SCRIPT_DIR/download_egohands.sh" || \
-    echo "[warn] EgoHands download failed; v3.1 mix sampler will renormalize without egohands. Continuing."
+echo "=== EgoHands (Wayback IU mirror) ==="
+timeout 300 bash "$SCRIPT_DIR/download_egohands.sh" || \
+    echo "[warn] EgoHands download failed or timed out; v3.1 mix sampler will renormalize without egohands. Continuing."
 
 echo "=== MPII Human Pose v1.0 ==="
 bash "$SCRIPT_DIR/download_mpii.sh" || \
