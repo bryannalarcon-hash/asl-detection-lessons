@@ -180,21 +180,26 @@ def main() -> int:
                 continue
 
         print(f"\n=== {src} ===")
-        if src == "hagrid":
-            ds = HaGRIDDataset(f"{args.data_root}/hagrid", split="train")
-        elif src == "coco":
-            ds = CocoWholeBodyDataset(
-                ann_file=f"{args.data_root}/coco/annotations/coco_wholebody_train_v1.0.json",
-                image_root=f"{args.data_root}/coco/train2017",
-            )
-        elif src == "freihand":
-            ds = FreiHANDDataset(f"{args.data_root}/FreiHAND_pub_v2")
-        elif src == "egohands":
-            ds = EgoHandsDataset(f"{args.data_root}/egohands", split="train")
-        elif src == "synthetic":
-            ds = SyntheticCompositeDataset(f"{args.data_root}/synthetic_hands")
-        else:
-            print(f"  unknown source: {src}", file=sys.stderr)
+        try:
+            if src == "hagrid":
+                ds = HaGRIDDataset(f"{args.data_root}/hagrid", split="train")
+            elif src == "coco":
+                ds = CocoWholeBodyDataset(
+                    ann_file=f"{args.data_root}/coco/annotations/coco_wholebody_train_v1.0.json",
+                    image_root=f"{args.data_root}/coco/train2017",
+                )
+            elif src == "freihand":
+                ds = FreiHANDDataset(f"{args.data_root}/FreiHAND_pub_v2")
+            elif src == "egohands":
+                ds = EgoHandsDataset(f"{args.data_root}/egohands", split="train")
+            elif src == "synthetic":
+                ds = SyntheticCompositeDataset(f"{args.data_root}/synthetic_hands")
+            else:
+                print(f"  unknown source: {src}", file=sys.stderr)
+                continue
+        except (FileNotFoundError, OSError) as e:
+            print(f"  [warn] {src} unavailable, skipping cache build: {e}",
+                  file=sys.stderr)
             continue
 
         paths = collect_unique_paths(ds, max_samples=args.max_samples)
