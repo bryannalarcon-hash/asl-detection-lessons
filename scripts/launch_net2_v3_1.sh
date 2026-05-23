@@ -142,12 +142,12 @@ SSH_CMD=(ssh $SSH_OPTS -p "$SSH_PORT" "$REMOTE")
 echo "[5/8] rsync code + datasets (scp; no .git, no .env)"
 "${SSH_CMD[@]}" "mkdir -p /workspace/asl/logs /workspace/asl/data"
 
-# Code only — datasets are downloaded on the remote to save bandwidth.
+# Code only. Positive-include list keeps the tar under 5 MB even if the
+# dev box has venvs / build artifacts / design zips sitting around.
 TAR_TMP="/tmp/asl_code_${INSTANCE_ID}.tar.gz"
-tar --exclude='.git' --exclude='.env*' --exclude='__pycache__' \
-    --exclude='data' --exclude='results' --exclude='checkpoints' \
-    --exclude='node_modules' --exclude='*.log' \
-    -czf "$TAR_TMP" -C "$REPO_ROOT" .
+tar --exclude='__pycache__' --exclude='*.pyc' --exclude='*.log' \
+    -czf "$TAR_TMP" -C "$REPO_ROOT" \
+    src configs scripts modal_apps tests requirements.txt
 scp $SCP_OPTS "$TAR_TMP" "$REMOTE:/workspace/asl_code.tar.gz"
 rm -f "$TAR_TMP"
 "${SSH_CMD[@]}" "tar -xzf /workspace/asl_code.tar.gz -C /workspace/asl && rm /workspace/asl_code.tar.gz"
