@@ -154,7 +154,8 @@ bash scripts/download_v3_data.sh --net2-only 2>&1 | tee -a logs/download.log
 
 echo "[remote] build npy cache at 256"
 python -u scripts/build_net2_cache.py --cache-root data/net2_cache \
-    --input-size 256 --sources hagrid,coco --workers 32 2>&1 | tee -a logs/build_cache.log
+    --input-size 256 --sources hagrid,coco,freihand,egohands,synthetic \
+    --workers 32 2>&1 | tee -a logs/build_cache.log
 
 ulimit -n 65536
 
