@@ -9,6 +9,18 @@
 # Requires .env.local with VAST_API set. Never commit secrets, never push.
 # Re-running the script while an instance is already up is a no-op (no
 # double-spawn).
+#
+# One-time setup: register the public key on the vast account so the
+# instance authorizes the launcher's ssh calls. Run once per dev box:
+#   vastai create ssh-key "$(cat ~/.ssh/vast_v3.pub)"
+# And add to ~/.ssh/config so all ssh invocations pick up the right
+# identity even without -i:
+#   Host *.vast.ai
+#       IdentityFile ~/.ssh/vast_v3
+#       IdentitiesOnly yes
+# Newly provisioned instances pull keys from account on boot. If the
+# key is uploaded after provisioning, attach it explicitly:
+#   vastai attach ssh <instance_id> "$(cat ~/.ssh/vast_v3.pub)"
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
