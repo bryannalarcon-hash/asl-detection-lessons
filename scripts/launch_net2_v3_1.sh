@@ -64,8 +64,13 @@ fi
 # --- Search offers. -------------------------------------------------------
 echo "[2/8] searching offers (RTX 5090, >=200 GB, reliability2>=0.98, Utah/US pref)"
 OFFER_QUERY='gpu_name=RTX_5090 disk_space>=200 reliability2>=0.98 rentable=true verified=true'
-export OFFERS_JSON
-OFFER_ID=$(vastai search offers "$OFFER_QUERY" -o 'dph_total' --raw 2>/dev/null | python3 - <<'PY'
+# vast search occasionally returns empty under transient rate limits;
+# retry up to 5 times with backoff.
+OFFER_ID=""
+for try in 1 2 3 4 5; do
+    OFFERS_RAW=$(vastai search offers "$OFFER_QUERY" -o 'dph_total' --raw 2>/dev/null || true)
+    if [ -n "$OFFERS_RAW" ]; then
+        OFFER_ID=$(printf '%s' "$OFFERS_RAW" | python3 - <<'PY' 2>/dev/null || true
 import json, sys
 try:
     data = json.loads(sys.stdin.read())
@@ -83,8 +88,13 @@ data.sort(key=score)
 print(data[0]["id"])
 PY
 )
+    fi
+    [ -n "$OFFER_ID" ] && break
+    echo "      attempt $try: empty offers, retrying in $((try * 5))s"
+    sleep $((try * 5))
+done
 if [ -z "$OFFER_ID" ]; then
-    echo "[ERR] no 5090 offers matched filter" >&2
+    echo "[ERR] no 5090 offers after 5 retries" >&2
     exit 4
 fi
 echo "      picked offer $OFFER_ID"
