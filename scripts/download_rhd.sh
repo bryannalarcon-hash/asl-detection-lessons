@@ -30,7 +30,13 @@ set -euo pipefail
 DATA_DIR="${DATA_DIR:-data}"
 OUT_DIR="$DATA_DIR/RHD_published_v2"
 ZIP_PATH="$DATA_DIR/RHD_published_v2.zip"
-DEFAULT_URL="https://lmb.informatik.uni-freiburg.de/data/RenderedHandpose/RHD_v1-1.zip"
+# Freiburg's host went down some time before May 2026 with no Wayback
+# snapshot. Verified working mirror: a Google Drive copy preserved by
+# strawberryfg/RHDHand on GitHub. Partial-GET probe confirms identical
+# zip layout (RHD_published_v2/{training,evaluation}/...), 9.09 GB,
+# 2018-06-12 last-modified.
+GDRIVE_ID="1ahDGxYb6BmzQxRU_juv_QDFLbpHPMy29"
+DEFAULT_URL="https://drive.usercontent.google.com/download?id=${GDRIVE_ID}&export=download&confirm=t"
 RHD_URL="${RHD_URL:-$DEFAULT_URL}"
 
 # Idempotency: skip if both splits already have images + annotation pickle.
@@ -48,12 +54,16 @@ echo "=== Rendered Hand Pose Dataset (Freiburg) ==="
 echo "  destination: $OUT_DIR"
 echo "  source URL : $RHD_URL"
 
-if command -v curl >/dev/null 2>&1; then
+# gdown handles Google Drive's confirm token for files >100MB. Falls
+# back to curl on the pre-resolved usercontent URL.
+if command -v gdown >/dev/null 2>&1; then
+    gdown --fuzzy "https://drive.google.com/file/d/${GDRIVE_ID}/view" -O "$ZIP_PATH"
+elif command -v curl >/dev/null 2>&1; then
     curl -L --fail --retry 3 --retry-delay 5 -o "$ZIP_PATH" "$RHD_URL"
 elif command -v wget >/dev/null 2>&1; then
     wget -q -c -O "$ZIP_PATH" "$RHD_URL"
 else
-    echo "FATAL: neither curl nor wget is installed" >&2
+    echo "FATAL: none of gdown / curl / wget is installed" >&2
     exit 1
 fi
 

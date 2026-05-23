@@ -28,10 +28,19 @@ DATA_DIR="${DATA_DIR:-data}"
 OUT_DIR="$DATA_DIR/egohands"
 ZIP_PATH="$OUT_DIR/egohands_yolo.zip"
 
-# Roboflow public download URL for the EgoHands YOLOv8 export. Roboflow
-# serves the public hands dataset behind a stable URL; if the link rotates,
-# pass EGOHANDS_URL to override.
-DEFAULT_URL="https://public.roboflow.com/ds/cQpsg1MAA8?key=4ZxhvUVDhM"
+# Source ranking (May 2026 verification):
+# - Roboflow's `cQpsg1MAA8?key=4ZxhvUVDhM` URL returns 404 permanently
+#   (Roboflow rotated the key with no public replacement).
+# - Indiana University's `vision.soic.indiana.edu` migrated and the
+#   egohands assets were not preserved.
+# - Wayback Machine has a working snapshot of the original IU zip
+#   (1.33 GB), which extracts to `_LABELLED_SAMPLES/<video>/polygons.mat`
+#   format. Our adapter wants YOLO-format .txt labels.
+# Until a polygon->YOLO converter is wired (TODO), this download still
+# pulls the IU zip but the YOLO unpack step at the bottom won't find
+# the expected layout. The mix sampler renormalizes to drop egohands
+# when its split is missing — Net 2 v3.1 trains fine without it.
+DEFAULT_URL="https://web.archive.org/web/20240113004201/http://vision.soic.indiana.edu/egohands_files/egohands_data.zip"
 EGOHANDS_URL="${EGOHANDS_URL:-$DEFAULT_URL}"
 
 # Idempotency: skip if all three splits already have at least one labeled image.
