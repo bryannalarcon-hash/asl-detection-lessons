@@ -58,7 +58,17 @@ echo "=== EgoHands (Roboflow YOLO mirror) ==="
 echo "  destination: $OUT_DIR"
 echo "  source URL : $EGOHANDS_URL"
 
-if command -v curl >/dev/null 2>&1; then
+# Prefer S3 mirror (already in YOLO format, no polygon-conversion step
+# needed) when the launcher injected EGOHANDS_S3_PRESIGNED_TAR. Falls
+# back to Wayback IU zip (polygon format; downstream converter needed).
+if [ -n "${EGOHANDS_S3_PRESIGNED_TAR:-}" ]; then
+    echo "  using S3 presigned mirror (pre-converted YOLO)"
+    curl -L --fail --connect-timeout 15 --retry 3 --retry-delay 5 \
+        -o "${OUT_DIR}/egohands_yolo.tar.gz" "$EGOHANDS_S3_PRESIGNED_TAR"
+    tar -xzf "${OUT_DIR}/egohands_yolo.tar.gz" -C "$OUT_DIR" --strip-components=1
+    rm -f "${OUT_DIR}/egohands_yolo.tar.gz"
+    exit 0
+elif command -v curl >/dev/null 2>&1; then
     curl -L --fail --retry 3 --retry-delay 5 -o "$ZIP_PATH" "$EGOHANDS_URL"
 elif command -v wget >/dev/null 2>&1; then
     wget -q -c -O "$ZIP_PATH" "$EGOHANDS_URL"

@@ -54,9 +54,14 @@ echo "=== Rendered Hand Pose Dataset (Freiburg) ==="
 echo "  destination: $OUT_DIR"
 echo "  source URL : $RHD_URL"
 
-# gdown handles Google Drive's confirm token for files >100MB. Falls
-# back to curl on the pre-resolved usercontent URL.
-if command -v gdown >/dev/null 2>&1; then
+# Prefer S3 presigned URL (faster + no third-party flakiness) when the
+# launcher injected one via RHD_S3_PRESIGNED_URL. Falls through to gdown
+# / curl / wget on the Google Drive mirror.
+if [ -n "${RHD_S3_PRESIGNED_URL:-}" ]; then
+    echo "  using S3 presigned mirror"
+    curl -L --fail --connect-timeout 15 --retry 3 --retry-delay 5 \
+        -o "$ZIP_PATH" "$RHD_S3_PRESIGNED_URL"
+elif command -v gdown >/dev/null 2>&1; then
     gdown --fuzzy "https://drive.google.com/file/d/${GDRIVE_ID}/view" -O "$ZIP_PATH"
 elif command -v curl >/dev/null 2>&1; then
     curl -L --fail --retry 3 --retry-delay 5 -o "$ZIP_PATH" "$RHD_URL"
