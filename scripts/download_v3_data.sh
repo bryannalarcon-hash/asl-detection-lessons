@@ -196,10 +196,12 @@ bash "$SCRIPT_DIR/download_egohands.sh" || \
     echo "[warn] EgoHands download failed; v3.1 mix sampler will renormalize without egohands. Continuing."
 
 echo "=== MPII Human Pose v1.0 ==="
-bash "$SCRIPT_DIR/download_mpii.sh"
+bash "$SCRIPT_DIR/download_mpii.sh" || \
+    echo "[warn] MPII download failed; Net 1 v3.1 mix sampler will renormalize without it"
 
 echo "=== RHD (Rendered Hand Pose) ==="
-bash "$SCRIPT_DIR/download_rhd.sh"
+timeout 600 bash "$SCRIPT_DIR/download_rhd.sh" || \
+    echo "[warn] RHD download failed or timed out; Net 3 mix sampler will renormalize without it"
 
 # ----- Synthetic composites -----
 # Depends on FreiHAND + COCO being on disk; both blocks above either
