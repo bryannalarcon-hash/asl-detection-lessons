@@ -135,10 +135,15 @@ def main() -> None:
         if "sources" in stage_cfg:
             cfg.setdefault("data", {})["sources"] = list(stage_cfg["sources"])
         # init_from forwards into args.resume_from when no explicit CLI override.
+        # warm_start separates "load weights from a prior stage" from a true
+        # resume — the former resets the epoch counter so the new stage's
+        # epoch budget is honored.
+        args.warm_start = False
         if stage_cfg.get("init_from") and not args.resume_from:
             init_from = stage_cfg["init_from"]
             if Path(init_from).exists():
                 args.resume_from = init_from
+                args.warm_start = True
             else:
                 print(f"[warn] curriculum.{args.stage}.init_from={init_from!r} "
                       f"does not exist; starting from scratch", flush=True)
@@ -316,11 +321,14 @@ def main() -> None:
         model.load_state_dict(ckpt["model"])
         ema = AveragedModel(model, multi_avg_fn=get_ema_multi_avg_fn(
             deep_get(cfg, "train.ema_decay", 0.9998)))
-        start_epoch = int(ckpt.get("epoch", 0)) + 1
-        # Fast-forward the cosine scheduler so LR matches the resumed epoch.
-        for _ in range(start_epoch):
-            scheduler.step()
-        print(f"[init] resumed from {args.resume_from} → starting at epoch {start_epoch}")
+        if getattr(args, "warm_start", False):
+            print(f"[init] warm-start weights from {args.resume_from} (epoch counter reset to 0)")
+        else:
+            start_epoch = int(ckpt.get("epoch", 0)) + 1
+            # Fast-forward the cosine scheduler so LR matches the resumed epoch.
+            for _ in range(start_epoch):
+                scheduler.step()
+            print(f"[init] resumed from {args.resume_from} → starting at epoch {start_epoch}")
 
     if args.use_numba_anchors:
         from src.stage1.models.anchors_numba import warmup as _numba_warmup
@@ -489,6 +497,13 @@ def main() -> None:
             torch.save({"model": ema.module.state_dict(), "epoch": epoch,
                         "metrics": line, "config": cfg},
                        ckpt_dir / f"epoch_{epoch:03d}.pt")
+
+    # Defense in depth: if the for-loop never ran (empty range), skip the
+    # final save instead of crashing on an undefined `epoch`.
+    if "epoch" not in dir() and "epoch" not in locals():
+        print("[warn] no epochs ran (range was empty); not writing last.pt")
+        print(f"[done] best_loss={best_loss:.5f}")
+        return
 
     torch.save({"model": ema.module.state_dict(), "epoch": epoch,
                 "metrics": line, "config": cfg}, ckpt_dir / "last.pt")
