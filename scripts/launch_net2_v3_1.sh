@@ -88,7 +88,7 @@ echo "      instance $INSTANCE_ID"
 
 cleanup() {
     echo "[cleanup] destroying instance $INSTANCE_ID"
-    vastai destroy instance "$INSTANCE_ID" || true
+    yes | vastai destroy instance "$INSTANCE_ID" 2>&1 | head -2 || true
 }
 trap cleanup EXIT INT TERM
 
@@ -97,9 +97,18 @@ echo "[4/8] waiting for ssh"
 SSH_HOST=""; SSH_PORT=""
 for _ in $(seq 1 60); do
     INFO=$(vastai show instance "$INSTANCE_ID" --raw 2>/dev/null || echo "{}")
-    SSH_HOST=$(python3 -c "import json,sys; d=json.loads('''$INFO'''); print(d.get('ssh_host','') or '')")
-    SSH_PORT=$(python3 -c "import json,sys; d=json.loads('''$INFO'''); print(d.get('ssh_port','') or '')")
-    STATUS=$(python3 -c "import json,sys; d=json.loads('''$INFO'''); print(d.get('actual_status','') or '')")
+    PARSED=$(printf '%s' "$INFO" | python3 -c "
+import json, sys
+try:
+    d = json.loads(sys.stdin.read())
+except Exception:
+    print('|||'); sys.exit(0)
+print(f\"{d.get('ssh_host','') or ''}|{d.get('ssh_port','') or ''}|{d.get('actual_status','') or ''}\")
+")
+    SSH_HOST="${PARSED%%|*}"
+    rest="${PARSED#*|}"
+    SSH_PORT="${rest%%|*}"
+    STATUS="${rest#*|}"
     if [ "$STATUS" = "running" ] && [ -n "$SSH_HOST" ] && [ -n "$SSH_PORT" ]; then
         if ssh $SSH_OPTS -p "$SSH_PORT" "root@$SSH_HOST" 'echo ok' >/dev/null 2>&1; then
             break
