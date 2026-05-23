@@ -65,10 +65,12 @@ fi
 echo "[2/8] searching offers (RTX 5090, >=200 GB, reliability2>=0.98, Utah/US pref)"
 OFFER_QUERY='gpu_name=RTX_5090 disk_space>=200 reliability2>=0.98 rentable=true verified=true'
 export OFFERS_JSON
-OFFERS_JSON=$(vastai search offers "$OFFER_QUERY" -o 'dph_total' --raw 2>/dev/null || echo "[]")
-OFFER_ID=$(OFFERS_JSON="$OFFERS_JSON" python3 - <<'PY'
-import json, os, sys
-data = json.loads(os.environ.get("OFFERS_JSON", "[]"))
+OFFER_ID=$(vastai search offers "$OFFER_QUERY" -o 'dph_total' --raw 2>/dev/null | python3 - <<'PY'
+import json, sys
+try:
+    data = json.loads(sys.stdin.read())
+except Exception:
+    sys.exit(0)
 if not data:
     sys.exit(0)
 prefer = ("UT", "Utah")
