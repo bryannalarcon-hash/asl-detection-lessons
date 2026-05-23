@@ -48,9 +48,19 @@ def compute_pck(
     threshold_px = threshold_frac * image_size
     per_kp = pck_at_threshold(pred_image, gt_coords_image, vis_mask, threshold_px)
 
+    # If the model was trained on a keypoint slice (e.g. Net 1 face+body only,
+    # K=7), the per-kp indices don't align with the 49-kp schema. Index only
+    # the slots that fit.
+    K = per_kp.shape[0]
+    def _safe_mean(indices):
+        idx = [i for i in indices if i < K]
+        if not idx:
+            return float("nan")
+        return float(per_kp[idx].mean().item())
+
     return {
         "pck_overall": float(per_kp.mean().item()),
-        "pck_hands": float(per_kp[S.HAND_INDICES_RIGHT + S.HAND_INDICES_LEFT].mean().item()),
-        "pck_face": float(per_kp[S.FACE_INDICES].mean().item()),
-        "pck_body": float(per_kp[S.BODY_INDICES].mean().item()),
+        "pck_hands": _safe_mean(S.HAND_INDICES_RIGHT + S.HAND_INDICES_LEFT),
+        "pck_face": _safe_mean(S.FACE_INDICES),
+        "pck_body": _safe_mean(S.BODY_INDICES),
     }

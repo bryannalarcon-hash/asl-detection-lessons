@@ -9,6 +9,13 @@
 #   - unzip installed via apt
 set -euo pipefail
 
+# --net2-only skips InterHand2.6M (Net-3-only, ~80GB)
+NET2_ONLY=0
+if [ "${1:-}" = "--net2-only" ]; then
+    NET2_ONLY=1
+    echo "[download] --net2-only set: skipping InterHand2.6M"
+fi
+
 DATA_DIR="${DATA_DIR:-data}"
 mkdir -p "$DATA_DIR/coco/annotations" "$DATA_DIR/hagrid"
 
@@ -128,7 +135,9 @@ else
 fi
 
 # ----- InterHand2.6M -----
-if [ -d "$DATA_DIR/interhand/annotations/train" ] \
+if [ "$NET2_ONLY" = "1" ]; then
+    echo "=== InterHand2.6M: skipped (--net2-only) ==="
+elif [ -d "$DATA_DIR/interhand/annotations/train" ] \
    && ls "$DATA_DIR/interhand/annotations/train"/*.json >/dev/null 2>&1; then
     echo "=== InterHand2.6M: already present, skipping ==="
 else
@@ -175,6 +184,34 @@ else
             -exec mv -f {} annotations/test/ \;
         rm -rf annotations_raw
     )
+fi
+
+# ----- Auxiliary Net 2 sources (EgoHands, MPII, RHD) -----
+# Each helper script is responsible for its own idempotency (skip-if-present).
+# We invoke them unconditionally and rely on `set -e` to surface real failures.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+echo "=== EgoHands (Roboflow YOLO mirror) ==="
+bash "$SCRIPT_DIR/download_egohands.sh"
+
+echo "=== MPII Human Pose v1.0 ==="
+bash "$SCRIPT_DIR/download_mpii.sh"
+
+echo "=== RHD (Rendered Hand Pose) ==="
+bash "$SCRIPT_DIR/download_rhd.sh"
+
+# ----- Synthetic composites -----
+# Depends on FreiHAND + COCO being on disk; both blocks above either
+# completed or `set -e` already aborted. Builder script is idempotent.
+echo "=== Synthetic hand-in-scene composites ==="
+if [ -f "$DATA_DIR/synthetic_hands/anno.jsonl" ]; then
+    echo "  synthetic_hands/anno.jsonl present, skipping"
+else
+    python "$SCRIPT_DIR/build_synthetic_composites.py" \
+        --frei-root "$DATA_DIR/FreiHAND_pub_v2" \
+        --coco-ann "$DATA_DIR/coco/annotations/coco_wholebody_train_v1.0.json" \
+        --coco-img "$DATA_DIR/coco/train2017" \
+        --out "$DATA_DIR/synthetic_hands"
 fi
 
 echo ""

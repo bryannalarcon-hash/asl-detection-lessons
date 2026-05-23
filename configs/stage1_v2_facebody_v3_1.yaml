@@ -1,0 +1,60 @@
+run_name: stage1_v2_facebody_v3_1
+
+data:
+  coco_root: data/coco
+  coco_ann_file: data/coco/annotations/coco_wholebody_train_v1.0.json
+  coco_val_ann_file: data/coco/annotations/coco_wholebody_val_v1.0.json
+  coco_train_images: train2017
+  coco_val_images: train2017
+  freihand_root: data/FreiHAND_pub_v2
+  mpii_root: data/mpii
+  image_size: 256
+  heatmap_size: 64
+  heatmap_sigma: 2.0
+  sample_ratio_coco: 0.7
+  sample_ratio_freihand: 0.3
+  flip_prob: 0.5
+  color_jitter: 0.2
+  # Slice of the 49-keypoint vector to keep: indices 42-48 = face (3) + body (4).
+  # See src/stage1/data/schema.py FACE_INDICES + BODY_INDICES.
+  keypoint_slice: [42, 49]
+  # Per-source sampling proportions. Trainer maps the keys to cache subdirs:
+  #   coco_wholebody -> coco_train
+  #   mpii           -> mpii_train
+  #   freihand       -> freihand_train
+  # Sources absent from cache are dropped with a warning; the remaining
+  # weights are renormalized. Missing target_mix => legacy ConcatDataset
+  # behavior (uniform shuffle across all available cached sources).
+  target_mix:
+    coco_wholebody: 0.70
+    mpii: 0.30
+
+model:
+  num_keypoints: 7
+  backbone_channels: [32, 64, 128, 256, 384]
+  heatmap_channels: 256
+
+train:
+  batch_size: 128
+  num_workers: 32
+  # Finetune from the v3 best.pt. 60 epochs of MPII-augmented mix on a
+  # reduced LR — not from scratch.
+  epochs: 60
+  resume_from: results/v3/net1/stage1_v2_facebody/best.pt
+  # Original lr=1.0e-3 divided by 5 for finetune.
+  lr: 2.0e-4
+  lr_min: 2.0e-5
+  weight_decay: 1.0e-4
+  early_stop_patience: 20
+  early_stop_min_delta: 0.001
+  mixed_precision: true
+  # BF16 retained from the v3 run.
+  # channels_last + fused_adamw remain off after Modal Xid 43 lesson —
+  # don't re-enable without re-validating end-to-end.
+  use_bf16: true
+  channels_last: false
+  fused_adamw: false
+  log_every: 50
+  val_every: 1
+  checkpoint_dir: checkpoints/stage1_v2_facebody_v3_1
+  seed: 42

@@ -1,10 +1,12 @@
 """Stage 1 v3 — Net 3 (hand landmark) training.
 
-  python -u -m src.stage1.train_v3_landmark --config configs/stage1_v3_landmark_phase1.yaml
-  python -u -m src.stage1.train_v3_landmark --config configs/stage1_v3_landmark_phase2.yaml
+  python -u -m src.stage1.train_v3_landmark --config configs/stage1_v3_landmark_v1.yaml
 
-The --config selects phase. Phase 2 should set `data.phase2_bbox_cache` to a
-JSON of {image_id: [x, y, w, h]} produced by predict_bboxes_for_phase2.py.
+A single-config run targeting 200 epochs with a weighted per-source sampler
+(`data.target_mix`), BF16 mixed precision, FreiHAND held-out PCK@0.05 eval
+each epoch, and periodic S3 checkpoint sync when `train.s3_bucket` is set.
+The older two-phase configs are still accepted; missing keys fall back to
+the historical defaults.
 """
 from __future__ import annotations
 
@@ -26,6 +28,10 @@ try:
 except RuntimeError:
     pass
 
+# cudnn auto-picks the fastest conv algo per shape. Enabled by default —
+# leave on for ~2x throughput vs the cudnn default algorithm.
+torch.backends.cudnn.benchmark = True
+
 from src.common.seed import set_seed
 from src.common.v3_config import deep_get, load_v3_config
 from src.stage1.augment.transforms_v3 import GPUAugmentation
@@ -34,6 +40,10 @@ from src.stage1.data.interhand import InterHand26MDataset
 from src.stage1.data.landmark_dataset import LandmarkTrainDataset
 from src.stage1.losses_v3 import LandmarkLoss
 from src.stage1.models.landmark_net import HandLandmarkNet, count_params
+from src.stage1.train_v3_landmark_helpers import (
+    build_freihand_val_loader, build_rhd_dataset, build_target_mix_sampler,
+    eval_pck_freihand, s3_upload,
+)
 
 
 def _gpu_render_heatmaps(coords: torch.Tensor, vis: torch.Tensor,
@@ -96,8 +106,10 @@ def main() -> None:
     ih_root = deep_get(cfg, "data.interhand_root")
     if ih_root and (Path(ih_root) / "annotations" / "train").exists():
         interhand = InterHand26MDataset(ih_root, split="train")
+    rhd = build_rhd_dataset(cfg)
     print(f"[data] freihand={len(freihand):,}  "
-          f"interhand={len(interhand) if interhand else 0:,}", flush=True)
+          f"interhand={len(interhand) if interhand else 0:,}  "
+          f"rhd={len(rhd) if rhd else 0:,}", flush=True)
 
     if use_dali:
         from src.stage1.data.dali_pipelines import DALILandmarkLoader
@@ -133,17 +145,27 @@ def main() -> None:
             jitter_rot=deep_get(cfg, "data.jitter_rot", 10.0),
             phase2_bbox_cache=deep_get(cfg, "data.phase2_bbox_cache"),
             phase2_mix_prob=deep_get(cfg, "data.phase2_mix_prob", 0.0),
+            rhd_dataset=rhd,
         )
+        # WeightedRandomSampler honours data.target_mix when configured.
+        # We compute weights against the unwrapped dataset before any Subset.
+        target_mix = deep_get(cfg, "data.target_mix") or {}
+        sampler = build_target_mix_sampler(train_ds, target_mix)
+
         if args.data_limit:
             train_ds = Subset(train_ds, range(min(args.data_limit, len(train_ds))))
+            sampler = None  # Subset breaks the sampler's index alignment
 
         loader = DataLoader(
             train_ds, batch_size=deep_get(cfg, "train.batch_size"),
-            shuffle=True, num_workers=deep_get(cfg, "train.num_workers"),
+            shuffle=(sampler is None), sampler=sampler,
+            num_workers=deep_get(cfg, "train.num_workers"),
             pin_memory=True, drop_last=True,
             persistent_workers=deep_get(cfg, "train.num_workers") > 0,
             prefetch_factor=4 if deep_get(cfg, "train.num_workers") > 0 else None,
         )
+        if sampler is not None:
+            print(f"[data] target_mix sampler active: {target_mix}", flush=True)
         steps_per_epoch = None
 
     # Model + loss ------------------------------------------------------
@@ -174,9 +196,14 @@ def main() -> None:
     scheduler = CosineAnnealingLR(optimizer,
                                   T_max=deep_get(cfg, "train.epochs"),
                                   eta_min=deep_get(cfg, "train.lr_min"))
-    scaler = (torch.amp.GradScaler(device=device)
-              if deep_get(cfg, "train.mixed_precision") and device == "cuda"
-              else None)
+    # BF16 mixed precision: same exponent range as FP32, no loss scaling
+    # needed. Dropping GradScaler eliminates the CPU-side state that was
+    # invalidating CUDA Graph capture. BF16 is the modern training default
+    # on Blackwell (RTX 5090 has full BF16 throughput). Either
+    # train.use_bf16 or train.mixed_precision can request BF16.
+    use_amp_bf16 = (bool(deep_get(cfg, "train.use_bf16",
+                                  deep_get(cfg, "train.mixed_precision", False)))
+                    and device == "cuda")
     ema = AveragedModel(model, multi_avg_fn=get_ema_multi_avg_fn(
         deep_get(cfg, "train.ema_decay", 0.9998)))
 
@@ -193,6 +220,23 @@ def main() -> None:
     hm_size = deep_get(cfg, "data.heatmap_size", 56)
     sigma = deep_get(cfg, "data.heatmap_sigma", 2.0)
 
+    # Held-out FreiHAND val loader for per-epoch PCK eval. None if the data
+    # is missing — training still proceeds, val_pck reports as nan.
+    val_loader, val_n = build_freihand_val_loader(cfg, crop_size)
+    if val_loader is not None:
+        print(f"[val] FreiHAND held-out PCK eval enabled — {val_n} samples", flush=True)
+    else:
+        print("[val] FreiHAND held-out split unavailable; val_pck will be nan", flush=True)
+    pck_thresh_frac = float(deep_get(cfg, "eval.pck_threshold_frac", 0.05))
+
+    # S3 sync config. Empty bucket disables network uploads.
+    s3_bucket = str(deep_get(cfg, "train.s3_bucket", "") or "").strip()
+    s3_prefix = str(deep_get(cfg, "train.s3_prefix", "net3/checkpoints")).strip("/")
+    s3_sync_every = int(deep_get(cfg, "train.s3_sync_every", 10))
+    if s3_bucket:
+        print(f"[s3] sync target: s3://{s3_bucket}/{s3_prefix}/ every "
+              f"{s3_sync_every} epochs", flush=True)
+
     # CUDA Graphs state. We re-capture at each epoch boundary because the
     # landmark loss bakes the `epoch` int into its coord-ramp coefficient —
     # capturing once would freeze the ramp value. Capture is ~1 s; amortized
@@ -201,11 +245,11 @@ def main() -> None:
     # The captured region includes:
     #   gpu_aug(image, coords)           # kornia GPU aug — graph-safe
     #   _gpu_render_heatmaps(...)        # pure-tensor GPU ops
-    #   model(aug_image)                 # forward
+    #   model(aug_image)                 # forward (BF16 autocast, no scaler)
     #   loss_fn(...)                     # AdaptiveWing + soft-argmax
-    #   scaler.scale(loss).backward()
+    #   loss.backward()
     # OUTSIDE the graph (per-step, after replay):
-    #   scaler.unscale_ / clip_grad_norm_ / scaler.step / scaler.update
+    #   clip_grad_norm_ / optimizer.step
     #   ema.update_parameters(model)
     #   live PCK computation (logging only)
     graph_state: dict = {"graph": None, "epoch": -1}
@@ -229,8 +273,8 @@ def main() -> None:
         static_vis.copy_(sample_vis)
 
         # Warmup on a side stream. Full training step (with optimizer.step)
-        # to warm cudnn algorithm picker, AMP scaler, kornia compiled
-        # internals, etc.
+        # to warm cudnn algorithm picker, kornia compiled internals, etc.
+        # BF16 autocast has no CPU-side state so it is capture-safe.
         s = torch.cuda.Stream()
         s.wait_stream(torch.cuda.current_stream())
         with torch.cuda.stream(s):
@@ -240,25 +284,19 @@ def main() -> None:
                     aug_img_w, coords_aug_w = gpu_aug(static_image, static_coords)
                     heatmaps_w, vis_mask_w, coords_hm_w = _gpu_render_heatmaps(
                         coords_aug_w, static_vis, crop_size, hm_size, sigma)
-                if scaler is not None:
-                    with torch.amp.autocast(device_type="cuda", dtype=torch.float16):
+                if use_amp_bf16:
+                    with torch.amp.autocast(device_type="cuda", dtype=torch.bfloat16):
                         pred_w = model(aug_img_w)
                         out_w = loss_fn(pred_w, heatmaps_w, coords_hm_w, vis_mask_w,
                                         epoch=epoch_for_capture)
-                    scaler.scale(out_w["loss"]).backward()
-                    scaler.unscale_(optimizer)
-                    torch.nn.utils.clip_grad_norm_(
-                        model.parameters(), deep_get(cfg, "train.grad_clip", 1.0))
-                    scaler.step(optimizer)
-                    scaler.update()
                 else:
                     pred_w = model(aug_img_w)
                     out_w = loss_fn(pred_w, heatmaps_w, coords_hm_w, vis_mask_w,
                                     epoch=epoch_for_capture)
-                    out_w["loss"].backward()
-                    torch.nn.utils.clip_grad_norm_(
-                        model.parameters(), deep_get(cfg, "train.grad_clip", 1.0))
-                    optimizer.step()
+                out_w["loss"].backward()
+                torch.nn.utils.clip_grad_norm_(
+                    model.parameters(), deep_get(cfg, "train.grad_clip", 1.0))
+                optimizer.step()
         torch.cuda.current_stream().wait_stream(s)
         # Zero grads in place to keep gradient storage addresses stable for
         # the captured graph (do NOT use set_to_none=True here).
@@ -267,23 +305,29 @@ def main() -> None:
                 p_.grad.detach_()
                 p_.grad.zero_()
 
+        # Disable cudnn.benchmark during capture (trial-kernel probes are NOT
+        # stream-capture-safe). The warmup already picked the best algo for
+        # these shapes; the cache persists across the benchmark=False window.
+        prev_benchmark = torch.backends.cudnn.benchmark
+        torch.backends.cudnn.benchmark = False
+
         g = torch.cuda.CUDAGraph()
         with torch.cuda.graph(g):
             with torch.no_grad():
                 aug_image, coords_aug = gpu_aug(static_image, static_coords)
                 heatmaps, vis_mask, coords_hm = _gpu_render_heatmaps(
                     coords_aug, static_vis, crop_size, hm_size, sigma)
-            if scaler is not None:
-                with torch.amp.autocast(device_type="cuda", dtype=torch.float16):
+            if use_amp_bf16:
+                with torch.amp.autocast(device_type="cuda", dtype=torch.bfloat16):
                     static_pred = model(aug_image)
                     static_out = loss_fn(static_pred, heatmaps, coords_hm, vis_mask,
                                          epoch=epoch_for_capture)
-                scaler.scale(static_out["loss"]).backward()
             else:
                 static_pred = model(aug_image)
                 static_out = loss_fn(static_pred, heatmaps, coords_hm, vis_mask,
                                      epoch=epoch_for_capture)
-                static_out["loss"].backward()
+            static_out["loss"].backward()
+        torch.backends.cudnn.benchmark = prev_benchmark
         return {
             "graph": g,
             "epoch": epoch_for_capture,
@@ -337,17 +381,11 @@ def main() -> None:
                 graph_state["static_coords"].copy_(coords, non_blocking=True)
                 graph_state["static_vis"].copy_(vis, non_blocking=True)
                 graph_state["graph"].replay()
-                # Optimizer / clip / EMA stay OUTSIDE the graph.
-                if scaler is not None:
-                    scaler.unscale_(optimizer)
-                    torch.nn.utils.clip_grad_norm_(
-                        model.parameters(), deep_get(cfg, "train.grad_clip", 1.0))
-                    scaler.step(optimizer)
-                    scaler.update()
-                else:
-                    torch.nn.utils.clip_grad_norm_(
-                        model.parameters(), deep_get(cfg, "train.grad_clip", 1.0))
-                    optimizer.step()
+                # Optimizer / clip / EMA stay OUTSIDE the graph (CPU state).
+                # With BF16 (no scaler), no scale/unscale dance needed.
+                torch.nn.utils.clip_grad_norm_(
+                    model.parameters(), deep_get(cfg, "train.grad_clip", 1.0))
+                optimizer.step()
                 ema.update_parameters(model)
                 # Zero grads in-place to preserve the graph's static grad
                 # storage. set_to_none=True would invalidate addresses.
@@ -370,23 +408,17 @@ def main() -> None:
                     )
 
                 optimizer.zero_grad(set_to_none=True)
-                if scaler is not None:
-                    with torch.amp.autocast(device_type="cuda", dtype=torch.float16):
+                if use_amp_bf16:
+                    with torch.amp.autocast(device_type="cuda", dtype=torch.bfloat16):
                         pred = model(image)
                         out = loss_fn(pred, heatmaps, coords_hm, vis_mask, epoch=epoch)
-                    scaler.scale(out["loss"]).backward()
-                    scaler.unscale_(optimizer)
-                    torch.nn.utils.clip_grad_norm_(model.parameters(),
-                                                   deep_get(cfg, "train.grad_clip", 1.0))
-                    scaler.step(optimizer)
-                    scaler.update()
                 else:
                     pred = model(image)
                     out = loss_fn(pred, heatmaps, coords_hm, vis_mask, epoch=epoch)
-                    out["loss"].backward()
-                    torch.nn.utils.clip_grad_norm_(model.parameters(),
-                                                   deep_get(cfg, "train.grad_clip", 1.0))
-                    optimizer.step()
+                out["loss"].backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(),
+                                               deep_get(cfg, "train.grad_clip", 1.0))
+                optimizer.step()
                 ema.update_parameters(model)
             running += float(out["loss"].item())
             n_steps += 1
@@ -407,37 +439,59 @@ def main() -> None:
 
         if epoch >= warmup:
             scheduler.step()
+        # Held-out FreiHAND PCK eval (EMA weights — what we ship).
+        val_pck = eval_pck_freihand(ema.module, val_loader, device,
+                                    crop_size, hm_size, pck_thresh_frac,
+                                    use_amp_bf16)
+
         epoch_secs = time.time() - epoch_t0
         avg_loss = running / max(n_steps, 1)
         avg_pck = pck_acc / max(n_steps, 1)
         line = {
             "epoch": epoch, "epoch_secs": round(epoch_secs, 1),
             "train_loss": avg_loss, "train_pck": avg_pck,
+            "val_pck": val_pck,
             "lr": optimizer.param_groups[0]["lr"],
         }
         with metrics_log.open("a") as f:
             f.write(json.dumps(line) + "\n")
-        print(f"[epoch {epoch:03d}] took={epoch_secs:.1f}s  loss={avg_loss:.5f}  "
-              f"train_pck@0.05={avg_pck:.3f}  lr={line['lr']:.6f}", flush=True)
+        val_pck_str = f"{val_pck:.3f}" if val_pck == val_pck else "nan"
+        print(f"epoch {epoch} | train_loss {avg_loss:.3f} | "
+              f"val_pck {val_pck_str} | elapsed {epoch_secs/60:.1f} min",
+              flush=True)
 
-        if avg_pck > best_pck + deep_get(cfg, "train.early_stop_min_delta", 0.001):
-            best_pck = avg_pck
+        # `best` tracks val PCK when available, otherwise the training PCK
+        # surrogate as before. This keeps the legacy phase configs working.
+        score = val_pck if (val_pck == val_pck) else avg_pck
+        improved = score > best_pck + deep_get(cfg, "train.early_stop_min_delta", 0.001)
+        if improved:
+            best_pck = score
             patience = 0
+            best_path = ckpt_dir / "best.pt"
             torch.save({"model": ema.module.state_dict(), "epoch": epoch,
-                        "metrics": line, "config": cfg}, ckpt_dir / "best.pt")
+                        "metrics": line, "config": cfg}, best_path)
+            if s3_bucket:
+                s3_upload(best_path, s3_bucket, f"{s3_prefix}/best.pt")
         else:
             patience += 1
             if patience >= deep_get(cfg, "train.early_stop_patience", 25):
-                print(f"[early-stop] no improvement for {patience} epochs")
+                print(f"[early-stop] no improvement for {patience} epochs", flush=True)
                 break
         if (epoch + 1) % 10 == 0:
+            snap_path = ckpt_dir / f"epoch_{epoch:03d}.pt"
             torch.save({"model": ema.module.state_dict(), "epoch": epoch,
-                        "metrics": line, "config": cfg},
-                       ckpt_dir / f"epoch_{epoch:03d}.pt")
+                        "metrics": line, "config": cfg}, snap_path)
+            if s3_bucket and ((epoch + 1) % s3_sync_every == 0):
+                s3_upload(snap_path, s3_bucket, f"{s3_prefix}/{snap_path.name}")
+                s3_upload(metrics_log, s3_bucket, f"{s3_prefix}/metrics.jsonl")
 
+    last_path = ckpt_dir / "last.pt"
     torch.save({"model": ema.module.state_dict(), "epoch": epoch,
-                "metrics": line, "config": cfg}, ckpt_dir / "last.pt")
-    print(f"[done] best_train_pck@0.05={best_pck:.3f}")
+                "metrics": line, "config": cfg}, last_path)
+    if s3_bucket:
+        s3_upload(last_path, s3_bucket, f"{s3_prefix}/last.pt")
+        s3_upload(metrics_log, s3_bucket, f"{s3_prefix}/metrics.jsonl")
+    print(f"[done] best_pck={best_pck:.3f}", flush=True)
 
 
 if __name__ == "__main__":

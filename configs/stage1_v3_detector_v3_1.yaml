@@ -1,0 +1,88 @@
+run_name: stage1_v3_detector_v3_1
+
+data:
+  coco_root: data/coco
+  coco_ann_file: data/coco/annotations/coco_wholebody_train_v1.0.json
+  coco_val_ann_file: data/coco/annotations/coco_wholebody_val_v1.0.json
+  coco_train_images: train2017
+  coco_val_images: train2017
+  freihand_root: data/FreiHAND_pub_v2
+  hagrid_root: data/hagrid
+  egohands_root: data/egohands
+  synthetic_root: data/synthetic_hands
+  input_size: 256
+  padding_frac: 0.5
+  cache_root: data/net2_cache
+  # Balanced mix used in stage_b. stage_a forces hagrid-only via curriculum.
+  target_mix:
+    coco_wholebody: 0.55
+    hagrid: 0.20
+    egohands: 0.10
+    freihand: 0.05
+    synthetic: 0.10
+
+model:
+  n_anchors_per_cell: 2
+  n_aux_kpts: 0
+  # Mini-FPN top-down lateral path with shared prediction head. Gives small
+  # palms in body-scene crops their own anchor scale at stride 8.
+  use_fpn: true
+  fpn_channels: 64
+  # Per-scale anchor counts (P1, P2, P3) matching anchors.scales_per_stride.
+  anchors_per_scale: [2, 2, 1]
+
+loss:
+  focal_alpha: 0.25
+  focal_gamma: 2.0
+  box_weight: 1.0
+  smoothl1_beta: 0.11
+
+anchors:
+  pos_iou: 0.5
+  neg_iou: 0.4
+  # Multi-stride anchor scales. One list per detection stride:
+  #   stride 8  -> tiny hands ([0.05, 0.10] of input = 13 px, 26 px)
+  #   stride 16 -> medium hands ([0.20, 0.35]      = 51 px, 90 px)
+  #   stride 32 -> large hands  ([0.55]            = 141 px)
+  strides: [8, 16, 32]
+  scales_per_stride:
+    - [0.05, 0.10]
+    - [0.20, 0.35]
+    - [0.55]
+
+train:
+  batch_size: 256
+  num_workers: 32
+  # Defaults below are overridden per --stage from curriculum.<stage>.
+  # They exist so a plain (stage-less) `load_config` smoke test succeeds.
+  epochs: 40
+  lr: 1.0e-3
+  lr_min: 1.0e-5
+  warmup_epochs: 3
+  weight_decay: 1.0e-4
+  grad_clip: 1.0
+  ema_decay: 0.9998
+  mixed_precision: true
+  early_stop_patience: 20
+  early_stop_min_delta: 0.001
+  log_every: 50
+  val_every: 1
+  checkpoint_dir: checkpoints/stage1_v3_detector_v3_1
+  seed: 42
+
+# Two-stage curriculum. Trainer reads `curriculum.<stage>` based on --stage CLI flag.
+curriculum:
+  stage_a:
+    description: hagrid-only pretrain — easy regime, learn hand shape priors
+    sources: [hagrid]
+    epochs: 40
+    lr: 1.0e-3
+    init_from: null
+    checkpoint_dir: checkpoints/stage1_v3_detector_v3_1/stage_a
+  stage_b:
+    description: balanced mix finetune — small hands in full-body scenes
+    sources: [coco_wholebody, hagrid, egohands, freihand, synthetic]
+    epochs: 30
+    lr: 1.0e-4
+    init_from: checkpoints/stage1_v3_detector_v3_1/stage_a/best.pt
+    checkpoint_dir: checkpoints/stage1_v3_detector_v3_1/stage_b

@@ -45,10 +45,16 @@ python -u scripts/build_net2_cache.py --cache-root data/net2_cache --input-size 
 
 echo ""
 echo "================================================================"
-echo "[4/8] train Net 2 (palm detector)"
+echo "[4/8] train Net 2 (palm detector) — DALI + cache + precompute + numba"
 echo "================================================================"
 mkdir -p logs
+RESUME_ARG=""
+if [ -f checkpoints/stage1_v3_detector/best_epoch8_pre_dali.pt ]; then
+    RESUME_ARG="--resume-from checkpoints/stage1_v3_detector/best_epoch8_pre_dali.pt"
+    echo "  resuming from epoch 8 checkpoint"
+fi
 python -u -m src.stage1.train_v3_detector --config configs/stage1_v3_detector.yaml \
+    --use-dali --use-numba-anchors $RESUME_ARG \
     2>&1 | tee logs/train_v3_detector.log
 
 echo ""
@@ -61,18 +67,20 @@ python -u scripts/predict_bboxes_for_phase2.py \
 
 echo ""
 echo "================================================================"
-echo "[6/8] train Net 3 Phase 1 (~5 hr)"
+echo "[6/8] train Net 3 Phase 1 — DALI + parallel JPEG callback"
 echo "================================================================"
 python -u -m src.stage1.train_v3_landmark \
     --config configs/stage1_v3_landmark_phase1.yaml \
+    --use-dali \
     2>&1 | tee logs/train_v3_landmark_phase1.log
 
 echo ""
 echo "================================================================"
-echo "[7/8] train Net 3 Phase 2 fine-tune (~1 hr)"
+echo "[7/8] train Net 3 Phase 2 fine-tune (~1 hr) — DALI"
 echo "================================================================"
 python -u -m src.stage1.train_v3_landmark \
     --config configs/stage1_v3_landmark_phase2.yaml \
+    --use-dali \
     2>&1 | tee logs/train_v3_landmark_phase2.log
 
 echo ""

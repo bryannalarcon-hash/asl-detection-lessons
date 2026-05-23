@@ -1,13 +1,19 @@
 """Hand landmark regressor — Net 3 of the v3 pipeline.
 
-Architecture (MobileNet-style, from scratch):
+Architecture (MobileNetV2-lite, from scratch — no pretrained weights):
   Input 224x224 RGB hand crop
-    → stem (Conv s2)
-    → 5 stages of depthwise-separable blocks (each ending in stride 2)
-    → 2 deconv stages (stride 2 each, restoring to 56x56)
-    → 1x1 head → 21 heatmaps at 56x56
+    → stem (Conv 3x3 s2)                       : 224 → 112,  3 → 32
+    → stage1 (2x DWSep, first s2)              : 112 → 56,  32 → 48
+    → stage2 (3x DWSep, first s2)              :  56 → 28,  48 → 96
+    → stage3 (3x DWSep, first s2)              :  28 → 14,  96 → 160
+    → stage4 (2x DWSep, first s2)              :  14 → 7,  160 → 256
+    → deconv head (3x ConvTranspose 4x4 s2)    :   7 → 56,  256 → 128 → 128 → 128
+    → 1x1 head                                 : 128 → 21
+  Output: (B, 21, 56, 56) heatmaps at output stride 4.
 
-Output stride 4, params ~1.8M.
+Feeds `AdaptiveWingLoss + SoftArgmaxCoordLoss` from losses_v3.LandmarkLoss.
+Param count ~1.27M (under the 1.5M budget). All weights trained from scratch —
+no MediaPipe, no ImageNet pretrain, no distillation (Req 7).
 """
 from __future__ import annotations
 
@@ -55,9 +61,9 @@ class _DeconvBlock(nn.Module):
 
 
 class HandLandmarkNet(nn.Module):
-    """21-keypoint heatmap regressor on cropped hand input. ~1.8M params.
+    """21-keypoint heatmap regressor on cropped hand input. ~1.27M params.
 
-    Designed for input 224x224 → 56x56 heatmaps (stride 4).
+    Input 224x224 RGB hand crop → 56x56 heatmaps (output stride 4).
     Run separately on each hand crop produced by Net 2.
     """
 
@@ -112,3 +118,18 @@ class HandLandmarkNet(nn.Module):
 
 def count_params(model: nn.Module) -> int:
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+if __name__ == "__main__":
+    # Smoke check: confirm param budget and IO contract.
+    model = HandLandmarkNet(num_keypoints=21)
+    model.eval()
+    n_params = count_params(model)
+    dummy = torch.randn(2, 3, 224, 224)
+    with torch.no_grad():
+        out = model(dummy)
+    print(f"params: {n_params:,}")
+    print(f"input : {tuple(dummy.shape)}")
+    print(f"output: {tuple(out.shape)}")
+    assert tuple(out.shape) == (2, 21, 56, 56), f"output shape mismatch: {out.shape}"
+    assert n_params < 1_500_000, f"param budget exceeded: {n_params:,} >= 1.5M"

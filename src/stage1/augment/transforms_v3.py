@@ -136,11 +136,11 @@ class GPUAugmentation(nn.Module):
         if keypoints is not None:
             x, keypoints_out = self.geom(x, keypoints)
         else:
-            # When no kpts, just apply geom on input alone via the same sequential.
-            # AugmentationSequential with data_keys=['input','keypoints'] requires
-            # both; sidestep by using K.RandomAffine + K.RandomHorizontalFlip directly.
-            x = self.geom.transforms[0](x)
-            x = self.geom.transforms[1](x)
+            # AugmentationSequential(data_keys=['input','keypoints']) wants both
+            # inputs. Pass dummy keypoints, discard the transformed copy.
+            B = x.shape[0]
+            dummy_kpts = torch.zeros(B, 1, 2, device=x.device, dtype=x.dtype)
+            x, _ = self.geom(x, dummy_kpts)
             keypoints_out = None
         x = self.photo(x)
         x = x.clamp(0, 1)

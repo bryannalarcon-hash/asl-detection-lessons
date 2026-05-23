@@ -38,8 +38,10 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
 
 from src.stage1.data.coco_wholebody import CocoWholeBodyDataset
+from src.stage1.data.egohands import EgoHandsDataset
 from src.stage1.data.freihand import FreiHANDDataset
 from src.stage1.data.hagrid import HaGRIDDataset
+from src.stage1.data.synthetic_composite import SyntheticCompositeDataset
 
 
 def collect_unique_paths(dataset, max_samples: int | None = None) -> list[str]:
@@ -153,7 +155,8 @@ def main() -> int:
     ap.add_argument("--cache-root", default="data/net2_cache")
     ap.add_argument("--input-size", type=int, default=192)
     ap.add_argument("--sources", default="hagrid,coco",
-                    help="Comma-separated subset of {hagrid,coco,freihand}.")
+                    help="Comma-separated subset of "
+                         "{hagrid,coco,freihand,egohands,synthetic}.")
     ap.add_argument("--data-root", default="data")
     ap.add_argument("--max-samples", type=int, default=None)
     ap.add_argument("--workers", type=int,
@@ -186,6 +189,10 @@ def main() -> int:
             )
         elif src == "freihand":
             ds = FreiHANDDataset(f"{args.data_root}/FreiHAND_pub_v2")
+        elif src == "egohands":
+            ds = EgoHandsDataset(f"{args.data_root}/egohands", split="train")
+        elif src == "synthetic":
+            ds = SyntheticCompositeDataset(f"{args.data_root}/synthetic_hands")
         else:
             print(f"  unknown source: {src}", file=sys.stderr)
             continue

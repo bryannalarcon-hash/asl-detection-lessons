@@ -1,15 +1,28 @@
-"""Palm detector — Net 2 of the v3 pipeline.
+"""Palm detector - Net 2 of the v3 pipeline.
 
-Architecture (BlazePalm-inspired, from scratch):
-  Input 192x192 RGB
-    → stem (Conv s2, BN, ReLU)
-    → 5 stages of depthwise-separable blocks (s2 each)
-    → 3 feature maps tapped at strides 8, 16, 32 (sizes 24, 12, 6)
-    → SSD-style detection head per scale
-  Outputs: classification logits + box deltas per anchor, plus an optional
-  small auxiliary head for keypoint offsets (wrist + middle-MCP) used to
-  estimate hand rotation at inference. We keep the aux head as zero-cost
-  optional; not required for the bbox-only loss path.
+Two architecture variants share the same depthwise-separable backbone:
+
+  Backbone (both variants, ~615K params at 192 input):
+    Input HxH RGB
+      -> stem (Conv s2, BN, ReLU)
+      -> 4 stages of depthwise-separable blocks (s2 each)
+      -> feature maps tapped at strides 8, 16, 32
+
+  Variant A (use_fpn=False, legacy SSDLite-style):
+    Three separate detection heads, one per scale (P1 64-ch, P2 96-ch,
+    P3 128-ch). Each emits cls + box deltas at A anchors per cell.
+
+  Variant B (use_fpn=True, mini-FPN top-down lateral):
+    1x1 lateral conv reduces each scale to a common FPN channel count.
+    Top-down: P3 lateral is upsampled and added to P2 lateral; the merged
+    map is upsampled and added to P1 lateral. Each merged map is smoothed
+    by a 3x3 depthwise-separable block. A SINGLE shared prediction head
+    (one cls conv + one box conv) is applied to all three FPN maps. Anchor
+    counts at the three strides must match the caller's anchor generator.
+
+  Output (both variants): concatenated cls (B, N) and box (B, N, 4)
+  tensors with N anchors stitched in P1 -> P2 -> P3 order. Optional aux
+  keypoint regression head when ``n_aux_kpts > 0`` (legacy variant only).
 """
 from __future__ import annotations
 
@@ -48,54 +61,133 @@ class _DWSepBlock(nn.Module):
 
 
 class PalmDetector(nn.Module):
-    """3-scale SSD-style palm detector. ~460K params."""
+    """3-scale palm detector with optional top-down FPN lateral path.
 
-    def __init__(self, n_anchors_per_cell: int = 3, n_aux_kpts: int = 0):
+    Args:
+        n_anchors_per_cell: legacy interface - number of anchors per cell
+            when ``anchors_per_scale`` is None. With FPN the prediction
+            head is shared across scales so all three scales emit the
+            same number of anchors per cell.
+        n_aux_kpts: optional auxiliary keypoint regression (legacy variant
+            only; ignored when ``use_fpn=True``).
+        use_fpn: enable the mini-FPN top-down lateral path with a shared
+            prediction head. Default False keeps the legacy architecture
+            byte-for-byte parameter-compatible with prior checkpoints.
+        fpn_channels: lateral channel count for the FPN path. 64 keeps the
+            head under the 1.5M total-param budget.
+        anchors_per_scale: optional tuple of length 3 giving (a_p1, a_p2,
+            a_p3) - the per-scale anchor count. When set, the legacy path
+            uses these to size each scale's head; the FPN path emits all
+            three at the shared head but the caller is responsible for
+            matching the head's anchor count to ``a_p1 == a_p2 == a_p3``
+            (since the head is shared). If the per-scale counts differ
+            the FPN constructor falls back to per-scale heads at the
+            FPN channel width.
+    """
+
+    def __init__(self,
+                 n_anchors_per_cell: int = 3,
+                 n_aux_kpts: int = 0,
+                 use_fpn: bool = False,
+                 fpn_channels: int = 64,
+                 anchors_per_scale: tuple[int, int, int] | None = None):
         super().__init__()
         self.n_anchors = n_anchors_per_cell
         self.n_aux_kpts = n_aux_kpts
+        self.use_fpn = use_fpn
+        self.fpn_channels = fpn_channels
+        if anchors_per_scale is None:
+            anchors_per_scale = (n_anchors_per_cell,) * 3
+        if len(anchors_per_scale) != 3:
+            raise ValueError("anchors_per_scale must be length 3 (P1, P2, P3)")
+        self.anchors_per_scale = tuple(int(a) for a in anchors_per_scale)
 
-        # Stem: 192 → 96
+        # Backbone (identical for both variants).
         self.stem = _conv_bn_relu(3, 24, stride=2)
-        # Stage 1: 96 → 48
         self.stage1 = nn.Sequential(_DWSepBlock(24, 32, stride=2),
                                     _DWSepBlock(32, 32))
-        # Stage 2 (P1 24x24): 48 → 24
         self.stage2 = nn.Sequential(_DWSepBlock(32, 64, stride=2),
                                     _DWSepBlock(64, 64),
                                     _DWSepBlock(64, 64))
-        # Stage 3 (P2 12x12): 24 → 12
         self.stage3 = nn.Sequential(_DWSepBlock(64, 96, stride=2),
                                     _DWSepBlock(96, 96),
                                     _DWSepBlock(96, 96))
-        # Stage 4 (P3 6x6): 12 → 6
         self.stage4 = nn.Sequential(_DWSepBlock(96, 128, stride=2),
                                     _DWSepBlock(128, 128))
 
-        # Detection heads (shared structure, separate weights per scale).
-        kpt_out = 2 * n_aux_kpts
-        self.head_p1 = self._make_head(64, kpt_out)
-        self.head_p2 = self._make_head(96, kpt_out)
-        self.head_p3 = self._make_head(128, kpt_out)
+        if use_fpn:
+            self._init_fpn_heads()
+        else:
+            self._init_legacy_heads()
 
         self._init_weights()
 
-    def _make_head(self, in_ch: int, kpt_out: int) -> nn.ModuleDict:
-        return nn.ModuleDict({
+    # ------------------------------------------------------------------
+    # Head construction
+    # ------------------------------------------------------------------
+    def _init_legacy_heads(self) -> None:
+        kpt_out = 2 * self.n_aux_kpts
+        a_p1, a_p2, a_p3 = self.anchors_per_scale
+        self.head_p1 = self._make_head(64, kpt_out, a_p1)
+        self.head_p2 = self._make_head(96, kpt_out, a_p2)
+        self.head_p3 = self._make_head(128, kpt_out, a_p3)
+
+    def _init_fpn_heads(self) -> None:
+        c = self.fpn_channels
+        # Lateral 1x1 to a common channel count.
+        self.lat_p1 = nn.Conv2d(64, c, 1, bias=False)
+        self.lat_p2 = nn.Conv2d(96, c, 1, bias=False)
+        self.lat_p3 = nn.Conv2d(128, c, 1, bias=False)
+        # Lateral norms stabilize the top-down addition. BN over c channels.
+        self.lat_bn_p1 = nn.BatchNorm2d(c)
+        self.lat_bn_p2 = nn.BatchNorm2d(c)
+        self.lat_bn_p3 = nn.BatchNorm2d(c)
+        # Post-merge smoothing - one DWSep block per scale.
+        self.smooth_p1 = _DWSepBlock(c, c)
+        self.smooth_p2 = _DWSepBlock(c, c)
+        self.smooth_p3 = _DWSepBlock(c, c)
+
+        # Shared prediction head - one cls conv and one box conv applied to
+        # every FPN map. The shared head only works if all three scales emit
+        # the same anchors-per-cell count; otherwise fall back to per-scale
+        # heads at the FPN channel width.
+        if len(set(self.anchors_per_scale)) == 1:
+            a = self.anchors_per_scale[0]
+            self.shared_head = nn.ModuleDict({
+                "stem": _conv_bn_relu(c, c),
+                "cls": nn.Conv2d(c, a, 1),
+                "box": nn.Conv2d(c, a * 4, 1),
+            })
+            self.fpn_shared_head = True
+        else:
+            # Per-scale heads, but at the (smaller) FPN channel width.
+            kpt_out = 0  # aux kpts not supported in FPN variant
+            self.head_p1 = self._make_head(c, kpt_out, self.anchors_per_scale[0])
+            self.head_p2 = self._make_head(c, kpt_out, self.anchors_per_scale[1])
+            self.head_p3 = self._make_head(c, kpt_out, self.anchors_per_scale[2])
+            self.fpn_shared_head = False
+
+    def _make_head(self, in_ch: int, kpt_out: int, n_anchors: int) -> nn.ModuleDict:
+        modules: dict[str, nn.Module] = {
             "cls": nn.Sequential(
                 _conv_bn_relu(in_ch, in_ch),
-                nn.Conv2d(in_ch, self.n_anchors, 1),
+                nn.Conv2d(in_ch, n_anchors, 1),
             ),
             "box": nn.Sequential(
                 _conv_bn_relu(in_ch, in_ch),
-                nn.Conv2d(in_ch, self.n_anchors * 4, 1),
+                nn.Conv2d(in_ch, n_anchors * 4, 1),
             ),
-            **({"kpt": nn.Sequential(
+        }
+        if kpt_out > 0:
+            modules["kpt"] = nn.Sequential(
                 _conv_bn_relu(in_ch, in_ch),
-                nn.Conv2d(in_ch, self.n_anchors * kpt_out, 1),
-            )} if kpt_out > 0 else {}),
-        })
+                nn.Conv2d(in_ch, n_anchors * kpt_out, 1),
+            )
+        return nn.ModuleDict(modules)
 
+    # ------------------------------------------------------------------
+    # Init
+    # ------------------------------------------------------------------
     def _init_weights(self) -> None:
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -103,45 +195,102 @@ class PalmDetector(nn.Module):
             elif isinstance(m, nn.BatchNorm2d):
                 nn.init.constant_(m.weight, 1.0)
                 nn.init.constant_(m.bias, 0.0)
-        # Bias init for focal loss stability: prior_p = 0.01 → bias = -log((1-p)/p)
+        # Bias init for focal loss stability: prior_p = 0.01 -> bias = -log((1-p)/p)
         prior = 0.01
-        for head in (self.head_p1, self.head_p2, self.head_p3):
-            cls_conv = head["cls"][-1]
-            nn.init.constant_(cls_conv.bias, -torch.log(torch.tensor((1 - prior) / prior)).item())
+        focal_bias = -torch.log(torch.tensor((1 - prior) / prior)).item()
+        if self.use_fpn and self.fpn_shared_head:
+            nn.init.constant_(self.shared_head["cls"].bias, focal_bias)
+        else:
+            for head in (self.head_p1, self.head_p2, self.head_p3):
+                cls_conv = head["cls"][-1]
+                nn.init.constant_(cls_conv.bias, focal_bias)
 
+    # ------------------------------------------------------------------
+    # Forward
+    # ------------------------------------------------------------------
     def forward(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
         x = self.stem(x)
         x = self.stage1(x)
-        p1 = self.stage2(x)
-        p2 = self.stage3(p1)
-        p3 = self.stage4(p2)
-        outs = {"cls": [], "box": [], "kpt": []}
+        p1 = self.stage2(x)   # stride 8
+        p2 = self.stage3(p1)  # stride 16
+        p3 = self.stage4(p2)  # stride 32
+
+        if self.use_fpn:
+            f1, f2, f3 = self._fpn_forward(p1, p2, p3)
+            return self._head_forward([(f1, "p1"), (f2, "p2"), (f3, "p3")])
+        return self._legacy_head_forward(p1, p2, p3)
+
+    def _fpn_forward(self, p1: torch.Tensor, p2: torch.Tensor, p3: torch.Tensor
+                     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        # Lateral 1x1 + BN to a common channel count.
+        l1 = self.lat_bn_p1(self.lat_p1(p1))
+        l2 = self.lat_bn_p2(self.lat_p2(p2))
+        l3 = self.lat_bn_p3(self.lat_p3(p3))
+        # Top-down: upsample-then-add. Bilinear upsample because nearest can
+        # tile-stripe small palms.
+        up3 = nn.functional.interpolate(l3, size=l2.shape[-2:],
+                                        mode="bilinear", align_corners=False)
+        m2 = l2 + up3
+        up2 = nn.functional.interpolate(m2, size=l1.shape[-2:],
+                                        mode="bilinear", align_corners=False)
+        m1 = l1 + up2
+        # Per-scale smoothing.
+        f1 = self.smooth_p1(m1)
+        f2 = self.smooth_p2(m2)
+        f3 = self.smooth_p3(l3)
+        return f1, f2, f3
+
+    def _head_forward(self, feats: list[tuple[torch.Tensor, str]]
+                      ) -> dict[str, torch.Tensor]:
+        cls_chunks: list[torch.Tensor] = []
+        box_chunks: list[torch.Tensor] = []
+        if self.use_fpn and self.fpn_shared_head:
+            head = self.shared_head
+            for feat, _name in feats:
+                t = head["stem"](feat)
+                cls = head["cls"](t)
+                box = head["box"](t)
+                cls_chunks.append(self._flatten(cls, 1))
+                box_chunks.append(self._flatten(box, 4))
+        else:
+            heads = {"p1": self.head_p1, "p2": self.head_p2, "p3": self.head_p3}
+            for feat, name in feats:
+                h = heads[name]
+                cls_chunks.append(self._flatten(h["cls"](feat), 1))
+                box_chunks.append(self._flatten(h["box"](feat), 4))
+        return {
+            "cls": torch.cat(cls_chunks, dim=1),  # (B, N_anchors)
+            "box": torch.cat(box_chunks, dim=1),  # (B, N_anchors, 4)
+        }
+
+    def _legacy_head_forward(self, p1: torch.Tensor, p2: torch.Tensor,
+                             p3: torch.Tensor) -> dict[str, torch.Tensor]:
+        outs: dict[str, list[torch.Tensor]] = {"cls": [], "box": [], "kpt": []}
         for feat, head in ((p1, self.head_p1), (p2, self.head_p2), (p3, self.head_p3)):
-            cls = head["cls"](feat)            # (B, A, H, W)
-            box = head["box"](feat)            # (B, A*4, H, W)
+            cls = head["cls"](feat)
+            box = head["box"](feat)
             outs["cls"].append(self._flatten(cls, 1))
             outs["box"].append(self._flatten(box, 4))
             if "kpt" in head:
                 kpt = head["kpt"](feat)
                 outs["kpt"].append(self._flatten(kpt, 2 * self.n_aux_kpts))
-        # Concatenate across scales in the same order as anchor generation
-        # (P1 → P2 → P3) so anchor index aligns with output index.
         result = {
-            "cls": torch.cat(outs["cls"], dim=1),  # (B, N_anchors)
-            "box": torch.cat(outs["box"], dim=1),  # (B, N_anchors, 4)
+            "cls": torch.cat(outs["cls"], dim=1),
+            "box": torch.cat(outs["box"], dim=1),
         }
         if self.n_aux_kpts > 0:
-            result["kpt"] = torch.cat(outs["kpt"], dim=1)  # (B, N, 2*kpts)
+            result["kpt"] = torch.cat(outs["kpt"], dim=1)
         return result
 
     @staticmethod
     def _flatten(t: torch.Tensor, per_anchor: int) -> torch.Tensor:
         B, C, H, W = t.shape
+        if per_anchor == 1:
+            return (t.permute(0, 2, 3, 1).contiguous()
+                     .view(B, H * W * (C // per_anchor), per_anchor)
+                     .squeeze(-1))
         return (t.permute(0, 2, 3, 1).contiguous()
-                 .view(B, H * W * (C // per_anchor), per_anchor)
-                 .squeeze(-1) if per_anchor == 1 else
-                 t.permute(0, 2, 3, 1).contiguous()
-                  .view(B, H * W * (C // per_anchor), per_anchor))
+                 .view(B, H * W * (C // per_anchor), per_anchor))
 
 
 def count_params(model: nn.Module) -> int:

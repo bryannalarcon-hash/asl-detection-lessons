@@ -28,18 +28,21 @@ class FocalClassificationLoss(nn.Module):
         self.gamma = gamma
 
     def forward(self, cls_logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        # cls_logits: (B, N), targets: (B, N) with values -1 / 0 / 1
-        valid = targets >= 0
-        cls = cls_logits[valid]
-        tgt = targets[valid].float()
-        p = torch.sigmoid(cls)
-        ce = torch.nn.functional.binary_cross_entropy_with_logits(cls, tgt, reduction="none")
+        # cls_logits: (B, N), targets: (B, N) with values -1 / 0 / 1.
+        # Multiplicative masking (no boolean indexing) so this is CUDA-Graphs
+        # capture-safe — variable-size masked tensors aren't.
+        # Treat ignore (-1) as 0 for the BCE math, then zero out their contribution
+        # via the `valid` mask at the end. This is exactly equivalent to the
+        # original `cls_logits[valid]` formulation because focal × 0 = 0.
+        tgt = targets.float().clamp(min=0.0)
+        p = torch.sigmoid(cls_logits)
+        ce = torch.nn.functional.binary_cross_entropy_with_logits(cls_logits, tgt, reduction="none")
         p_t = p * tgt + (1 - p) * (1 - tgt)
         alpha_t = self.alpha * tgt + (1 - self.alpha) * (1 - tgt)
-        focal = alpha_t * (1 - p_t) ** self.gamma * ce
-        # Normalize by number of positive anchors as in the focal-loss paper.
+        focal = alpha_t * (1 - p_t) ** self.gamma * ce              # (B, N)
+        valid = (targets >= 0).float()                                # (B, N) — 0/1 mask
         n_pos = (targets == 1).sum().clamp(min=1).float()
-        return focal.sum() / n_pos
+        return (focal * valid).sum() / n_pos
 
 
 class SmoothL1BoxLoss(nn.Module):
@@ -51,15 +54,20 @@ class SmoothL1BoxLoss(nn.Module):
 
     def forward(self, box_pred: torch.Tensor, box_target: torch.Tensor,
                 pos_mask: torch.Tensor) -> torch.Tensor:
-        # box_pred / box_target: (B, N, 4); pos_mask: (B, N) bool
-        if pos_mask.sum() == 0:
-            return box_pred.sum() * 0.0
+        # box_pred / box_target: (B, N, 4); pos_mask: (B, N) bool.
+        # Multiplicative masking (capture-safe) — was `loss[pos_mask].mean()`.
+        # `n_pos` is clamped to ≥1 to avoid division by zero when a batch has
+        # no positives; matches the spirit of the original `if sum==0: return 0`.
         diff = (box_pred - box_target).abs()
-        loss = torch.where(diff < self.beta,
-                           0.5 * diff ** 2 / self.beta,
-                           diff - 0.5 * self.beta)
-        loss = loss[pos_mask]
-        return loss.mean()
+        loss_per = torch.where(diff < self.beta,
+                               0.5 * diff ** 2 / self.beta,
+                               diff - 0.5 * self.beta)               # (B, N, 4)
+        pos_f = pos_mask.float().unsqueeze(-1)                        # (B, N, 1)
+        # Mean over the 4 channels of positives, normalized by num positive anchors.
+        # (Original: loss[pos_mask].mean() over (P*4) elements → equivalent here
+        # to total_sum / (n_pos * 4).)
+        n_pos = pos_mask.sum().clamp(min=1).float() * 4.0
+        return (loss_per * pos_f).sum() / n_pos
 
 
 class DetectorLoss(nn.Module):

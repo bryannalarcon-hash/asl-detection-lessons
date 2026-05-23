@@ -1,0 +1,78 @@
+run_name: stage1_v3_landmark_v1
+
+data:
+  freihand_root: data/FreiHAND_pub_v2
+  interhand_root: data/interhand
+  rhd_root: data/rhd
+  crop_size: 224
+  heatmap_size: 56
+  heatmap_sigma: 2.0
+  padding_frac: 0.5
+  jitter_shift: 0.10
+  jitter_scale: 0.15
+  jitter_rot: 10.0
+  phase2_bbox_cache: null
+  phase2_mix_prob: 0.0
+
+  # Per-source sampling weights. Each batch draws samples in expectation
+  # at these ratios using a WeightedRandomSampler. Sources missing from
+  # disk (e.g. RHD adapter not yet built) drop out and the remaining
+  # weights are renormalised at construction time.
+  target_mix:
+    freihand: 0.60
+    interhand_single: 0.30
+    rhd: 0.10
+
+  # InterHand has both single-hand and two-hand frames. The single-hand
+  # filter keeps only frames where exactly one hand is fully visible.
+  interhand_single_only: true
+
+  # FreiHAND held-out split for PCK eval. 5% of unique scenes are
+  # carved out and never seen during training. Same seed across runs
+  # to keep the val pool comparable.
+  freihand_val_frac: 0.05
+  freihand_val_seed: 42
+
+model:
+  num_keypoints: 21
+  heatmap_channels: 128
+
+loss:
+  awing_alpha: 2.1
+  awing_omega: 14.0
+  awing_epsilon: 1.0
+  awing_theta: 0.5
+  coord_weight: 0.1
+  coord_ramp_epochs: 5
+
+train:
+  batch_size: 256
+  num_workers: 16
+  epochs: 200
+  lr: 1.0e-3
+  lr_min: 1.0e-5
+  warmup_epochs: 3
+  weight_decay: 1.0e-4
+  grad_clip: 1.0
+  ema_decay: 0.9998
+  mixed_precision: true
+  use_bf16: true
+  early_stop_patience: 999
+  early_stop_min_delta: 0.001
+  log_every: 50
+  val_every: 1
+  checkpoint_dir: checkpoints/stage1_v3_landmark_v1
+  seed: 42
+
+  # S3 sync. Empty bucket disables upload. Best.pt is uploaded whenever
+  # val PCK improves; epoch_NNN.pt every `s3_sync_every` epochs.
+  s3_bucket: ""
+  s3_prefix: net3/checkpoints
+  s3_sync_every: 10
+
+eval:
+  # Held-out PCK eval on the FreiHAND held-out scenes. PCK threshold is
+  # a fraction of the crop side; 0.05 of 224 = 11.2 px in crop coords.
+  pck_threshold_frac: 0.05
+  max_val_samples: 2048
+  val_batch_size: 256

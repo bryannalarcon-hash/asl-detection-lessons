@@ -93,7 +93,48 @@ against future work.
 | Net 2 | 10 it/s (100 ms/batch) | 19.4 it/s (51 ms/batch) | 50 ms/batch — Python glue + DALI→torch + numpy anchor work |
 | Net 3 | 15 it/s (67 ms/batch) | 34.9 it/s (29 ms/batch) | 38 ms/batch — Python glue + DALI→torch + heatmap render |
 
-## Next: CUDA Graphs + DALI `fn.box_encoder`
+## 7. CUDA Graphs (attempted twice, abandoned)
+
+- Files affected: `train_v3_detector.py`, `train_v3_landmark.py` (both have a `--use-cuda-graphs` flag, off by default, capture functions present but disabled in launch_v3.sh)
+- First attempt: FP16 + GradScaler inside capture → `cudaErrorStreamCaptureInvalidated`. Suspected scaler lazy init / cudnn benchmark probing.
+- BF16 swap: dropped GradScaler entirely (BF16 has FP32's exponent range, no loss scaling needed). Still failed with same error.
+- Disabling `torch.backends.cudnn.benchmark` locally during capture: still failed.
+- `CUDA_LAUNCH_BLOCKING=1` revealed the real root cause: **`cls_logits[valid]` in `DetectorLoss`** — boolean masking with variable-size output is fundamentally not stream-capture-safe (capture needs static shapes).
+- Real fix would require rewriting `DetectorLoss` to use multiplicative masking (i.e., `cls_logits * valid_mask.float()` instead of `cls_logits[valid]`), then verifying the focal-loss numerics are unchanged. ~1-2 hr work + quality risk; deferred to v4.
+- **The BF16 swap stays in the tree** — modern training default, no measured loss-curve impact.
+
+## 8. Fully batched GPU anchor matcher (attempted, regressed, dropped)
+
+- Files affected: `models/anchors.py` (`build_targets_gpu_batched` function added, still in the file), `train_v3_detector.py` (`--use-gpu-anchor-matcher` flag, off by default)
+- Design: pad all GT counts to `max_M` in the batch, compute IoU as single (B, N, max_M) tensor, batched argmax + scatter for the "force-positive-per-GT" rule. Numerically verified equivalent to numpy `match_anchors_to_gt`.
+- Result: **5.5 it/s (45% slower than the 10 it/s numpy baseline)**. The per-sample padding loop (`for b in range(B): gt_padded[b, :m] = boxes[b].to(device)`) does 256 small CUDA copies per batch — same per-launch overhead pattern that's killed every other GPU-loop optimization.
+- Real fix would require batched `.to(device)` (concat all GTs into one big tensor, do one transfer + one scatter). Another medium-effort change; deferred to v4.
+- **Code stays in the tree for v4 reference.**
+
+## Final state before resuming training (June 22 21:00 UTC-ish)
+
+| Component | Status |
+|---|---|
+| DALI integration + parallel callback | ✅ kept |
+| `num_workers=32` | ✅ kept |
+| Decoded npy cache | ✅ kept |
+| BF16 mixed precision | ✅ kept (FP16+GradScaler removed) |
+| cudnn.benchmark=True (global) | ✅ kept |
+| GPU JPEG decode loop | ❌ dropped (per-launch overhead) |
+| GPU anchor matcher (loop) | ❌ kept in tree, off |
+| GPU anchor matcher (batched) | ❌ kept in tree, off |
+| DALI `fn.box_encoder` | ❌ kept in tree, off (CPU op, no win) |
+| CUDA Graphs | ❌ kept in tree, off (blocked on DetectorLoss boolean indexing) |
+
+Net wall-clock from here:
+- Net 2: ~10 it/s, ~3.3 hr remaining (resuming from epoch 8)
+- Net 3: ~15 it/s, ~10 hr full / ~3-5 hr w/ early-stop
+
+## v4 roadmap (deferred items)
+
+1. Rewrite `DetectorLoss` to use multiplicative masking → unblocks CUDA Graphs
+2. Fix the GPU anchor matcher's padding step (single `cat` + scatter, not a Python loop of `.to`)
+3. Together: would give ~2x Net 2 and ~1.5x Net 3 throughput
 
 The pattern of "small ops + Python glue + per-launch overhead" is best killed
 by:
