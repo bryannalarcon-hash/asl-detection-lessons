@@ -28,9 +28,11 @@ KPT_CACHE="$ROOT/data/signs/kpt_cache"
 NET4_CONFIG="$ROOT/configs/stage2_v4_classifier.yaml"
 NET4_CKPT_DIR="$ROOT/checkpoints/stage2_v4_classifier_v1"
 DONE_FLAG="$ROOT/.net4_done"
+SMOKE_FLAG="$ROOT/.smoke_done"
 KPT_DONE_FLAG="$ROOT/.kpts_done"
 NET3_DONE_FLAG="$ROOT/.net3_done"
 TOTAL_EPOCHS=200  # matches configs/stage1_v3_landmark_v1.yaml train.epochs
+SMOKE_OUT="$ROOT/results/v4/e2e_smoke_result.json"
 
 mkdir -p "$ROOT/logs" "$NET3_DST_DIR" "$KPT_CACHE" "$NET4_CKPT_DIR"
 
@@ -110,10 +112,38 @@ phase_train_net4() {
     --config "$NET4_CONFIG"
 }
 
-# --- Phase 5: mark done ---------------------------------------------------
+# --- Phase 5: e2e smoke test ----------------------------------------------
+phase_e2e_smoke() {
+  if [[ -f "$SMOKE_FLAG" ]]; then
+    log "phase 5 skipped (smoke flag exists)"; return 0
+  fi
+  log "phase 5: running e2e smoke test on test split"
+  cd "$ROOT"
+  mkdir -p "$ROOT/results/v4"
+  # The smoke runner exits non-zero on failure; we capture but still
+  # advance to phase 6 so flags reflect "complete" and the cron can
+  # surface the numbers regardless of pass/fail.
+  set +e
+  python3 -u -m scripts.e2e_smoke_test \
+    --manifest "$ROOT/data/signs/manifest.jsonl" \
+    --net1 "$ROOT/results/v3/net1_v3_1/best.pt" \
+    --net2 "$ROOT/results/v3/net2_v3_1/best.pt" \
+    --net3 "$NET3_DST_DIR/best.pt" \
+    --net4 "$NET4_CKPT_DIR/best.pt" \
+    --num-clips 30 \
+    --min-top3 0.5 \
+    --device cuda \
+    2>&1 | tee "$ROOT/logs/e2e_smoke.log"
+  smoke_status=$?
+  set -e
+  log "phase 5 done. smoke_status=$smoke_status (0=pass, nonzero=under-threshold)"
+  touch "$SMOKE_FLAG"
+}
+
+# --- Phase 6: mark done ---------------------------------------------------
 phase_done() {
   touch "$DONE_FLAG"
-  log "phase 5: ORCHESTRATOR DONE. flag at $DONE_FLAG"
+  log "phase 6: ORCHESTRATOR DONE. flag at $DONE_FLAG"
 }
 
 main() {
@@ -122,6 +152,7 @@ main() {
   phase_copy_net3
   phase_extract_kpts
   phase_train_net4
+  phase_e2e_smoke
   phase_done
 }
 
