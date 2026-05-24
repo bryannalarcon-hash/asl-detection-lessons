@@ -62,7 +62,8 @@ class InterHand26MDataset(Dataset):
 
     def __init__(self, root: str | Path, split: str = "train",
                  max_samples: int | None = None,
-                 hand_types: tuple[str, ...] = ALL_HAND_TYPES):
+                 hand_types: tuple[str, ...] = ALL_HAND_TYPES,
+                 index_file: str | Path | None = None):
         super().__init__()
         self.root = Path(root)
         allowed = set(hand_types)
@@ -73,24 +74,97 @@ class InterHand26MDataset(Dataset):
                 f"expected subset of {ALL_HAND_TYPES}"
             )
         self.hand_types = tuple(sorted(allowed))
+        # The 5fps tar extracts to InterHand2.6M_5fps_batch1/images/<split>/...
+        # not the bare images/<split>/... layout the original code assumed.
+        candidates = [
+            self.root / "images",
+            self.root / "InterHand2.6M_5fps_batch1" / "images",
+            self.root / "InterHand2.6M_5fps" / "images",
+        ]
+        self.images_root = next((c for c in candidates if c.is_dir()),
+                                self.root / "images")
+        # Auto-detect a prebuilt index file if not explicitly given. The
+        # prebuild runs the smart interacting-hand filter once and
+        # validates image-exists, so the constructor avoids a slow
+        # annotation walk + the per-sample missing-image churn.
+        if index_file is None:
+            default_idx = self.root / f"index_smart_{split}.jsonl"
+            if default_idx.is_file():
+                index_file = default_idx
         ann_dir = self.root / "annotations" / split
         data_json = ann_dir / f"InterHand2.6M_{split}_data.json"
         joint3d_json = ann_dir / f"InterHand2.6M_{split}_joint_3d.json"
         camera_json = ann_dir / f"InterHand2.6M_{split}_camera.json"
-        for p in (data_json, joint3d_json, camera_json):
+        for p in (joint3d_json, camera_json):
             if not p.exists():
                 raise FileNotFoundError(f"InterHand annotation missing: {p}")
+        if not index_file and not data_json.exists():
+            raise FileNotFoundError(f"InterHand annotation missing: {data_json}")
 
-        with data_json.open() as f:
-            meta = json.load(f)
+        if not index_file:
+            with data_json.open() as f:
+                meta = json.load(f)
+        else:
+            meta = None  # walked via index instead
         with joint3d_json.open() as f:
             self.joint3d = json.load(f)
         with camera_json.open() as f:
             self.cams = json.load(f)
 
+        self.samples: list[dict] = []
+        if index_file:
+            # Fast path: index entries already encode the smart filter
+            # decision (kept single + non-overlapping interacting) and
+            # image-exists validation. We still consult joint3d + camera
+            # to build per-sample arrays.
+            with open(index_file) as f:
+                for line in f:
+                    if max_samples and len(self.samples) >= max_samples:
+                        break
+                    e = json.loads(line)
+                    ht = e.get("hand_type", "interacting")
+                    if ht not in allowed:
+                        continue
+                    capture_id = str(e["capture_id"])
+                    frame_idx = e["frame_idx"]
+                    cam_id = e["cam_id"]
+                    joints = (self.joint3d.get(capture_id, {})
+                                          .get(str(frame_idx), {}))
+                    if "world_coord" not in joints:
+                        continue
+                    world_coord = np.asarray(joints["world_coord"],
+                                             dtype=np.float32)
+                    cap_cams = self.cams.get(capture_id, {})
+                    cam_str = str(cam_id)
+                    if cam_str not in cap_cams.get("campos", {}):
+                        continue
+                    R = np.asarray(cap_cams["camrot"][cam_str],
+                                   dtype=np.float32)
+                    t = np.asarray(cap_cams["campos"][cam_str],
+                                   dtype=np.float32)
+                    focal = np.asarray(cap_cams["focal"][cam_str],
+                                       dtype=np.float32)
+                    princpt = np.asarray(cap_cams["princpt"][cam_str],
+                                         dtype=np.float32)
+                    img_path = self.root / e["image_path"]
+                    hand_valid = ([1, 0] if ht == "right"
+                                  else [0, 1] if ht == "left"
+                                  else [1, 1])
+                    self.samples.append({
+                        "image_path": img_path,
+                        "world_coord": world_coord,
+                        "R": R, "t": t, "focal": focal, "princpt": princpt,
+                        "image_id": e.get("image_id", -1),
+                        "image_width": e.get("image_width"),
+                        "image_height": e.get("image_height"),
+                        "valid": hand_valid,
+                        "hand_type": ht,
+                    })
+            return
+
+        # Slow path: original annotation walk (no prebuilt index).
         # `images` and `annotations` follow COCO-style structure.
         images_by_id = {im["id"]: im for im in meta["images"]}
-        self.samples: list[dict] = []
         for ann in meta["annotations"]:
             if max_samples and len(self.samples) >= max_samples:
                 break
@@ -136,7 +210,7 @@ class InterHand26MDataset(Dataset):
                 else:
                     hand_valid = [1, 1]
             self.samples.append({
-                "image_path": (self.root / "images" / split / f"Capture{capture_id}"
+                "image_path": (self.images_root / split / f"Capture{capture_id}"
                                / seq_name / f"cam{cam_id}"
                                / f"image{frame_idx:05d}.jpg"),
                 "world_coord": world_coord,
