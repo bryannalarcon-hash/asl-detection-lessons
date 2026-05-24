@@ -42,7 +42,7 @@ from src.stage1.losses_v3 import LandmarkLoss
 from src.stage1.models.landmark_net import HandLandmarkNet, count_params
 from src.stage1.train_v3_landmark_helpers import (
     build_freihand_val_loader, build_rhd_dataset, build_target_mix_sampler,
-    eval_pck_freihand, s3_upload,
+    eval_pck_freihand, eval_pck_freihand_multi, s3_upload,
 )
 
 
@@ -249,6 +249,12 @@ def main() -> None:
     else:
         print("[val] FreiHAND held-out split unavailable; val_pck will be nan", flush=True)
     pck_thresh_frac = float(deep_get(cfg, "eval.pck_threshold_frac", 0.05))
+    pck_thresh_fracs = [float(x) for x in
+                        deep_get(cfg, "eval.pck_threshold_fracs",
+                                 [pck_thresh_frac])]
+    # The headline number used for best-checkpoint selection. Prefer 0.05
+    # when present; otherwise the lowest configured threshold.
+    pck_headline_frac = 0.05 if 0.05 in pck_thresh_fracs else min(pck_thresh_fracs)
 
     # S3 sync config. Empty bucket disables network uploads.
     s3_bucket = str(deep_get(cfg, "train.s3_bucket", "") or "").strip()
@@ -460,10 +466,13 @@ def main() -> None:
 
         if epoch >= warmup:
             scheduler.step()
-        # Held-out FreiHAND PCK eval (EMA weights — what we ship).
-        val_pck = eval_pck_freihand(ema.module, val_loader, device,
-                                    crop_size, hm_size, pck_thresh_frac,
-                                    use_amp_bf16)
+        # Held-out FreiHAND PCK eval at all configured thresholds
+        # (EMA weights — what we ship).
+        val_pck_multi = eval_pck_freihand_multi(
+            ema.module, val_loader, device, crop_size, hm_size,
+            pck_thresh_fracs, use_amp_bf16,
+        )
+        val_pck_headline = val_pck_multi.get(pck_headline_frac, float("nan"))
 
         epoch_secs = time.time() - epoch_t0
         avg_loss = running / max(n_steps, 1)
@@ -471,19 +480,26 @@ def main() -> None:
         line = {
             "epoch": epoch, "epoch_secs": round(epoch_secs, 1),
             "train_loss": avg_loss, "train_pck": avg_pck,
-            "val_pck": val_pck,
+            "val_pck": val_pck_headline,
             "lr": optimizer.param_groups[0]["lr"],
         }
+        for frac in pck_thresh_fracs:
+            line[f"val_pck_{int(round(frac * 100)):02d}"] = \
+                val_pck_multi.get(frac, float("nan"))
         with metrics_log.open("a") as f:
             f.write(json.dumps(line) + "\n")
-        val_pck_str = f"{val_pck:.3f}" if val_pck == val_pck else "nan"
+        parts = []
+        for frac in pck_thresh_fracs:
+            v = val_pck_multi.get(frac, float("nan"))
+            tag = f"val_pck_{int(round(frac * 100)):02d}"
+            parts.append(f"{tag} {v:.3f}" if v == v else f"{tag} nan")
         print(f"epoch {epoch} | train_loss {avg_loss:.3f} | "
-              f"val_pck {val_pck_str} | elapsed {epoch_secs/60:.1f} min",
+              f"{' | '.join(parts)} | elapsed {epoch_secs/60:.1f} min",
               flush=True)
 
-        # `best` tracks val PCK when available, otherwise the training PCK
-        # surrogate as before. This keeps the legacy phase configs working.
-        score = val_pck if (val_pck == val_pck) else avg_pck
+        # `best` tracks the headline val PCK when available, otherwise the
+        # training PCK surrogate. Keeps legacy phase configs working.
+        score = val_pck_headline if (val_pck_headline == val_pck_headline) else avg_pck
         improved = score > best_pck + deep_get(cfg, "train.early_stop_min_delta", 0.001)
         if improved:
             best_pck = score
