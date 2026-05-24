@@ -101,7 +101,7 @@ python -u -m src.stage2.train_v4_classifier \
 ### Step G — Wrap up
 1. Pull final results.
 2. Destroy Vast instance `37514594`.
-3. Update HANDOFF_V3_1.md with all results.
+3. Update docs/handoffs/HANDOFF_V3_1.md with all results.
 4. Final commit + push.
 
 ## Memory safety rules
@@ -116,7 +116,7 @@ python -u -m src.stage2.train_v4_classifier \
 
 `95e82264 — 7,27,47 * * * *` — session-only. If session restarts, recreate
 via `CronCreate` with the same 20-min health check prompt from
-docs/HANDOFF_V3_1.md section 9.
+docs/handoffs/HANDOFF_V3_1.md section 9.
 
 ## Files of interest
 

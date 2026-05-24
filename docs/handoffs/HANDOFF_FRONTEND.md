@@ -167,7 +167,7 @@ This list is the union of every change after `.scaffold-final-report.md`. Read i
 | `docs/research/dark-ui-depth.md` | Dark-mode depth + gradient + button research |
 | `docs/research/heatmap-patterns.md` | GitHub-style heatmap research |
 | `docs/research/step-indicators.md` | Drill indicator research |
-| `HANDOFF.md` | **This file** |
+| `docs/handoffs/HANDOFF_FRONTEND.md` | **This file** |
 | `frontend/src/pages/Practice.tsx` | The main practice loop. Resume cursor, sign-complete toast, mode toggles, auto-advance on green. Most-edited file. |
 | `frontend/src/pages/Dashboard.tsx` | Mastery bar, continue-last CTA, recent lessons, activity card |
 | `frontend/src/pages/LessonIntro.tsx` | Per-lesson mode toggles + back-to-source navigation |

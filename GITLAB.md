@@ -195,7 +195,7 @@ What **should** be tracked:
 - `docs/` (PRD, ux-spec, principles, training-plan, ml-handoff, competitive teardowns, research notes)
 - `scripts/` (seed, screenshots, etc.)
 - `configs/`, `tsconfig.base.json`, `playwright.config.ts`, `docker-compose.yml`, `.env.example`
-- `HANDOFF.md`, `README.md`, this `GITLAB.md`
+- `docs/handoffs/`, `README.md`, this `GITLAB.md`
 - `design/asl-pilot.zip` — the source design artifact (it's small, ~100 KB)
 
 Before the **first commit**, verify `.gitignore` covers everything in the must-stay-local list:
@@ -290,7 +290,7 @@ playwright:
 
 ## Important: do NOT push while build agents are running
 
-This repo uses the build-then-review swarm pattern (see `HANDOFF.md` §"Development workflow"). When swarm agents are mid-refactor, files are in inconsistent states. **Wait for the swarm to complete + the review swarm to greenlight before pushing.**
+This repo uses the build-then-review swarm pattern (see `CLAUDE.md` §"Swarm pattern" and `docs/handoffs/HANDOFF_FRONTEND.md` §"Development workflow"). When swarm agents are mid-refactor, files are in inconsistent states. **Wait for the swarm to complete + the review swarm to greenlight before pushing.**
 
 If `TaskList` shows any pending or in-progress build tasks, finish them first.
 
@@ -298,13 +298,13 @@ If `TaskList` shows any pending or in-progress build tasks, finish them first.
 
 ## Gitignore additions specific to this project
 
-The synthesis-clone-SB `.gitignore` blanket-ignores root-level markdown (`/*.md`) and allowlists `README.md`. For `asl-learning` we want to track more docs (HANDOFF, GITLAB), so the rule should look like:
+The synthesis-clone-SB `.gitignore` blanket-ignores root-level markdown (`/*.md`) and allowlists `README.md`. For `asl-learning` we want to track more docs (CLAUDE, GITLAB), so the rule should look like:
 
 ```
 # Track these root markdown files explicitly
 /*.md
 !/README.md
-!/HANDOFF.md
+!/CLAUDE.md
 !/GITLAB.md
 
 # Large artifacts

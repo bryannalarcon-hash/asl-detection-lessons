@@ -9,7 +9,7 @@
  * shipping it in a prod JS bundle would let anyone log in as the seeded user.
  *
  * Hard prod-deploy precondition: set `VITE_DEV_TOOLS=0` AND don't seed the
- * dev account on prod databases (see HANDOFF "Gotchas").
+ * dev account on prod databases (see docs/handoffs/HANDOFF_FRONTEND.md "Gotchas").
  *
  * These must mirror `DEV_EMAIL` / `DEV_PASSWORD` in
  * `scripts/seed-dev-user.ts`. The seed script is the source of truth.

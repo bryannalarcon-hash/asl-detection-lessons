@@ -278,7 +278,7 @@ against the user's $50-100 budget.
 
 ## 7. Things that broke last time — verify they still work
 
-From the v3.1 lessons (also in `docs/HANDOFF_V3_1.md` §4):
+From the v3.1 lessons (also in `docs/handoffs/HANDOFF_V3_1.md` §4):
 
 1. **tmux silently kills python after ~14 epochs** for Net 2's training
    mix. Use `nohup ... & disown`. Net 3 didn't hit this last time but
@@ -382,7 +382,7 @@ yes | vastai destroy instance <ID>
 
 - `docs/SWARM_FINDINGS.md` — the 7-agent swarm output (Nets 1/2/3/4 +
   arch + data + devil's advocate)
-- `docs/HANDOFF_V3_1.md` — original v3.1 round handoff (overlapping
+- `docs/handoffs/HANDOFF_V3_1.md` — original v3.1 round handoff (overlapping
   history; ignore the active-instance fields since instances are gone)
 - `docs/GOAL_STATE.md` — captures the overnight goal completion
 - `docs/hoyso-architecture.md` — Net 4 architecture reference

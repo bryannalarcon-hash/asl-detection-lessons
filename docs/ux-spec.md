@@ -2,7 +2,7 @@
 
 Reference for the v1 site build. Reads from [`principles.md`](./principles.md) (research synthesis) and the partner-project requirements. CV is black-boxed; bounding-box semantics are noted where they depend on the ML team's deliverables.
 
-> **Reading order**: this doc is the *as-designed* spec from the scaffold milestone. For *as-built* state and recent changes (state machine fixes, sign-complete toast, GitHub-style heatmap, cyan secondary accent, removed "Not quite" button, resume cursor, etc.), see `/HANDOFF.md` in the repo root and the §"Implementation notes — post-scaffold changes" section at the end of this file.
+> **Reading order**: this doc is the *as-designed* spec from the scaffold milestone. For *as-built* state and recent changes (state machine fixes, sign-complete toast, GitHub-style heatmap, cyan secondary accent, removed "Not quite" button, resume cursor, etc.), see `/docs/handoffs/HANDOFF_FRONTEND.md` in the repo root and the §"Implementation notes — post-scaffold changes" section at the end of this file.
 
 ---
 
@@ -639,7 +639,7 @@ Eventually we may want a "Demo" view for partners/investors that shows the popul
 
 ## Implementation notes — post-scaffold changes
 
-This section captures the deltas between the as-designed spec above and the as-built app, accumulated since the scaffold milestone shipped. See `/HANDOFF.md` for the full narrative.
+This section captures the deltas between the as-designed spec above and the as-built app, accumulated since the scaffold milestone shipped. See `/docs/handoffs/HANDOFF_FRONTEND.md` for the full narrative.
 
 ### Practice screen — additions/changes
 
@@ -711,7 +711,7 @@ The day-detail Dialog renders these lessons as a list with click-through to the 
 
 ### Tech-stack revisions
 
-- **shadcn 4.x with Base UI** (not Radix). The published `shadcn@latest` CLI shipped a v4 rewrite that uses `@base-ui/react` (Radix's modern successor by the Material team). Functionally equivalent; the swap is documented in `HANDOFF.md`'s Gotchas section. **Don't run `npx shadcn@latest add ...` after init — it overwrites `globals.css`.**
+- **shadcn 4.x with Base UI** (not Radix). The published `shadcn@latest` CLI shipped a v4 rewrite that uses `@base-ui/react` (Radix's modern successor by the Material team). Functionally equivalent; the swap is documented in `docs/handoffs/HANDOFF_FRONTEND.md`'s Gotchas section. **Don't run `npx shadcn@latest add ...` after init — it overwrites `globals.css`.**
 - **Atkinson Hyperlegible Mono doesn't exist as a published font.** We use Atkinson Hyperlegible (proportional) for sans + JetBrains Mono for mono + Bungee for display. The brand-alignment research mistakenly identified the SB site's mono font as a non-existent variant.
 
 ### Tests added since scaffold

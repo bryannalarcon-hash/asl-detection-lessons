@@ -1,7 +1,7 @@
 # Handoff — Stage 1 v3 Optimization Round (2026-05-22) — SUPERSEDED
 
 > **NOTE: This document is historical** (the 3-hour optimization sweep on the rented 5090).
-> **Current state is in `docs/HANDOFF_POST_TRAIN.md`.** Read that first.
+> **Current state is in `docs/handoffs/HANDOFF_POST_TRAIN.md`.** Read that first.
 > This file is kept for reference on what was tried/measured during the optimization round (anchor matcher numba, DALI cache, precompute pickles, channels_last/fused_adamw experiments).
 
 You are continuing work on the ASL Learning project's Stage 1 v3 training pipeline.
@@ -27,7 +27,7 @@ A persistent background SSH tail watching the remote training log + metrics file
 - **GPU**: RTX 5090 32 GB, Blackwell, US-Utah datacenter
 - **Rate**: ~$1.27/hr
 - **Wall-clock elapsed at handoff**: ~6.7 hr
-- **Hard kill (per HANDOFF.md)**: $20 v3 spend OR 14 wall-clock hours
+- **Hard kill (per HANDOFF_STAGE1.md)**: $20 v3 spend OR 14 wall-clock hours
 - **API key**: `.env.local` has `VAST_API` and `KAGGLE_API` — DO NOT echo or commit
 - **Working dir on remote**: `/workspace/asl-learning`
 - **Tmux session name**: `v3` (currently NOT running; production training paused)
@@ -147,10 +147,10 @@ I had just added `--channels-last` and `--fused-adamw` CLI flags to `train_v3_de
 - **`configs/stage1_v3_landmark_phase2.yaml`** — Net 3 P2 (10 epochs, batch 128, LR 1e-5, fine-tune from P1 best).
 
 ### Docs
-- **`docs/HANDOFF.md`** — original project handoff (BEFORE this optimization round). v3 plan, dataset details, conventions.
+- **`docs/handoffs/HANDOFF_STAGE1.md`** — original project handoff (BEFORE this optimization round). v3 plan, dataset details, conventions.
 - **`docs/optimization-attempts/README.md`** — full history of optimizations tried (8 numbered attempts with what worked and what didn't).
 - **`docs/optimization-attempts/v3-state-pre-cuda-graphs/`** — frozen snapshots of files before the CUDA Graphs deep-dive.
-- **`docs/HANDOFF_OPTIMIZATION_ROUND.md`** — THIS file.
+- **`docs/handoffs/HANDOFF_OPTIMIZATION_ROUND.md`** — THIS file.
 
 ## 8. What I'd do next (immediate continuation)
 

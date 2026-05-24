@@ -1,6 +1,6 @@
 # Handoff — Post-Training State (2026-05-23)
 
-Read this entirely before doing anything. Supersedes `HANDOFF_OPTIMIZATION_ROUND.md` (which is now historical).
+Read this entirely before doing anything. Supersedes `docs/handoffs/HANDOFF_OPTIMIZATION_ROUND.md` (which is now historical).
 
 ## 1. TL;DR
 

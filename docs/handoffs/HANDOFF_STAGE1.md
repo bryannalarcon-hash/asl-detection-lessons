@@ -105,7 +105,7 @@ scripts/
 tests/test_v3_schema.py           Pure-Python integrity checks (6 tests, all passing locally)
 
 docs/
-├── HANDOFF.md                    (this file)
+├── handoffs/HANDOFF_STAGE1.md    (this file)
 ├── training-plan.md              Original v1/v2 plan + lessons learned
 ├── v3-plan.md                    The swarm-synthesized v3 plan
 ├── hoyso-architecture.md         Stage 2 reference (not Stage 1)
