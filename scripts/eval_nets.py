@@ -121,11 +121,22 @@ def eval_net2_ap(net2_path: str, cache_root: Path, max_samples: int | None,
     device = "cpu"
     ckpt = torch.load(net2_path, map_location=device, weights_only=False)
     state = ckpt.get("model", ckpt)
-    # PalmDetector keeps backward-compat: only pass use_fpn when explicitly true,
-    # so old checkpoints (no FPN branch) still load on PalmDetector's default ctor.
-    pd_kwargs = dict(n_anchors_per_cell=3, n_aux_kpts=0)
+    # Pull model config off the checkpoint so eval mirrors training.
+    ck_cfg = ckpt.get("config") or {}
+    model_block = (ck_cfg.get("model") if isinstance(ck_cfg, dict)
+                   else getattr(ck_cfg, "model", None)) or {}
+    ck_n_anchors = (model_block.get("n_anchors_per_cell")
+                    if isinstance(model_block, dict)
+                    else getattr(model_block, "n_anchors_per_cell", None))
+    ck_aps = (model_block.get("anchors_per_scale")
+              if isinstance(model_block, dict)
+              else getattr(model_block, "anchors_per_scale", None))
+    pd_kwargs = dict(n_anchors_per_cell=int(ck_n_anchors) if ck_n_anchors else 3,
+                     n_aux_kpts=0)
     if use_fpn:
         pd_kwargs["use_fpn"] = True
+    if ck_aps:
+        pd_kwargs["anchors_per_scale"] = tuple(int(x) for x in ck_aps)
     model = PalmDetector(**pd_kwargs).to(device)
     model.load_state_dict(state, strict=False)
     model.eval()
@@ -144,7 +155,24 @@ def eval_net2_ap(net2_path: str, cache_root: Path, max_samples: int | None,
     def _load_img(i):
         return np.load(img_dir / f"{i:07d}.npy")
 
-    anchors_xywh = torch.from_numpy(get_anchors(net2_input)).float()
+    # Multi-stride (FPN) anchors when the trained config recorded them;
+    # otherwise the legacy uniform-scale single-stride layout. The
+    # checkpoint embeds the training config so eval matches train.
+    ck_cfg = ckpt.get("config") or {}
+    anchors_block = (ck_cfg.get("anchors") if isinstance(ck_cfg, dict)
+                     else getattr(ck_cfg, "anchors", None)) or {}
+    scales_per_stride = (anchors_block.get("scales_per_stride")
+                         if isinstance(anchors_block, dict)
+                         else getattr(anchors_block, "scales_per_stride", None))
+    strides_cfg = (anchors_block.get("strides")
+                   if isinstance(anchors_block, dict)
+                   else getattr(anchors_block, "strides", None))
+    if scales_per_stride and strides_cfg:
+        anchors_xywh = torch.from_numpy(get_anchors(
+            net2_input, scales_per_stride=scales_per_stride,
+            strides=strides_cfg)).float()
+    else:
+        anchors_xywh = torch.from_numpy(get_anchors(net2_input)).float()
 
     # Collect (score, tp/fp flag) records across samples + total GT count.
     score_tp_fp: list[tuple[float, int]] = []
