@@ -3,7 +3,7 @@ run_name: stage1_v3_landmark_v1
 data:
   freihand_root: data/FreiHAND_pub_v2
   interhand_root: data/interhand
-  rhd_root: data/rhd
+  rhd_root: data/RHD_published_v2
   crop_size: 224
   heatmap_size: 56
   heatmap_sigma: 2.0
@@ -49,6 +49,12 @@ train:
   batch_size: 256
   num_workers: 16
   epochs: 200
+  # Cap items drawn per epoch via WeightedRandomSampler num_samples.
+  # Source pool is ~3M (interhand x2 right+left expansion + freihand +
+  # rhd x2). At 6.4 it/s a full-pool epoch is ~30 min; capping to 250K
+  # gives ~2.5 min/epoch and ~8 hr for 200 epochs. Stochastic sampling
+  # spread across 200 epochs still covers the pool >16x in expectation.
+  samples_per_epoch: 250000
   lr: 1.0e-3
   lr_min: 1.0e-5
   warmup_epochs: 3

@@ -70,6 +70,7 @@ def build_rhd_dataset(cfg: dict) -> RHDDataset | None:
 
 def build_target_mix_sampler(train_ds, target_mix: dict,
                              source_aliases: dict | None = None,
+                             num_samples: int | None = None,
                              ) -> WeightedRandomSampler | None:
     """Per-sample weights so batch frequencies match `target_mix`.
 
@@ -78,6 +79,10 @@ def build_target_mix_sampler(train_ds, target_mix: dict,
     absent from the dataset drop out and the remaining weights are
     renormalised. Returns None when no per-source weighting is requested or
     the dataset cannot be weighted.
+
+    `num_samples` caps the items drawn per epoch (defaults to the full
+    dataset size). Smaller caps keep epoch wall-clock predictable when the
+    underlying pool is very large (InterHand + FreiHAND + RHD).
     """
     aliases = source_aliases or SOURCE_ALIASES
     items = getattr(train_ds, "items", None)
@@ -105,8 +110,9 @@ def build_target_mix_sampler(train_ds, target_mix: dict,
     weights = torch.as_tensor(per_sample_w, dtype=torch.double)
     if float(weights.sum()) <= 0:
         return None
+    n = int(num_samples) if num_samples and num_samples > 0 else len(per_sample_w)
     return WeightedRandomSampler(weights=weights,
-                                 num_samples=len(per_sample_w),
+                                 num_samples=n,
                                  replacement=True)
 
 

@@ -150,7 +150,9 @@ def main() -> None:
         # WeightedRandomSampler honours data.target_mix when configured.
         # We compute weights against the unwrapped dataset before any Subset.
         target_mix = deep_get(cfg, "data.target_mix") or {}
-        sampler = build_target_mix_sampler(train_ds, target_mix)
+        samples_per_epoch = deep_get(cfg, "train.samples_per_epoch")
+        sampler = build_target_mix_sampler(train_ds, target_mix,
+                                           num_samples=samples_per_epoch)
 
         if args.data_limit:
             train_ds = Subset(train_ds, range(min(args.data_limit, len(train_ds))))
