@@ -55,9 +55,11 @@ def load_net4(ckpt_path: str, device: str
     inc_lag2 = bool(data_cfg.get("include_lag2", True))
     in_channels = feature_dim(include_visibility=inc_vis,
                               include_lag1=inc_lag1, include_lag2=inc_lag2)
+    # gloss_to_idx is the ground truth for class count — the training config's
+    # num_classes may have been stale (catalog grew from 75 to 90 mid-session).
     model = SignClassifier(
         in_channels=in_channels,
-        num_classes=int(model_cfg.get("num_classes", len(gloss_to_idx))),
+        num_classes=len(gloss_to_idx),
         dim=int(model_cfg.get("dim", 192)),
         kernel=int(model_cfg.get("kernel", 17)),
         drop_path=0.0,
