@@ -99,15 +99,24 @@ class AdaptiveWingLoss(nn.Module):
 
     Wang et al. 2019 — smooth Wing penalty near GT peaks, MSE-like elsewhere.
     Better than vanilla MSE for fine-keypoint localization (fingertips).
+
+    `keypoint_weights` (optional) weights individual joints, e.g. fingertips
+    get 1.5x. Length must equal K.
     """
 
     def __init__(self, alpha: float = 2.1, omega: float = 14.0,
-                 epsilon: float = 1.0, theta: float = 0.5):
+                 epsilon: float = 1.0, theta: float = 0.5,
+                 keypoint_weights: list[float] | None = None):
         super().__init__()
         self.alpha = alpha
         self.omega = omega
         self.epsilon = epsilon
         self.theta = theta
+        if keypoint_weights is not None:
+            w = torch.tensor(keypoint_weights, dtype=torch.float32)
+            self.register_buffer("kp_weights", w, persistent=False)
+        else:
+            self.kp_weights = None
 
     def forward(self, pred: torch.Tensor, target: torch.Tensor,
                 vis_mask: torch.Tensor) -> torch.Tensor:
@@ -128,6 +137,8 @@ class AdaptiveWingLoss(nn.Module):
         per_pixel = torch.where(diff < self.theta, loss_inner, loss_outer)
         per_kp = per_pixel.mean(dim=(-1, -2))            # (B, K)
         weighted = per_kp * vis_mask
+        if self.kp_weights is not None:
+            weighted = weighted * self.kp_weights.to(weighted.device).unsqueeze(0)
         n_visible = vis_mask.sum().clamp(min=1.0)
         return weighted.sum() / n_visible
 
@@ -166,9 +177,12 @@ class LandmarkLoss(nn.Module):
     def __init__(self, awing_alpha: float = 2.1, awing_omega: float = 14.0,
                  awing_epsilon: float = 1.0, awing_theta: float = 0.5,
                  coord_weight: float = 0.1, coord_ramp_epochs: int = 5,
-                 coord_temperature: float = 10.0):
+                 coord_temperature: float = 10.0,
+                 keypoint_weights: list[float] | None = None):
         super().__init__()
-        self.awing = AdaptiveWingLoss(awing_alpha, awing_omega, awing_epsilon, awing_theta)
+        self.awing = AdaptiveWingLoss(awing_alpha, awing_omega, awing_epsilon,
+                                       awing_theta,
+                                       keypoint_weights=keypoint_weights)
         self.coord = SoftArgmaxCoordLoss(coord_temperature)
         self.coord_weight = coord_weight
         self.coord_ramp_epochs = coord_ramp_epochs

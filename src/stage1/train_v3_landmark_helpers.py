@@ -153,11 +153,52 @@ def build_freihand_val_loader(cfg: dict, crop_size: int):
 
 
 @torch.no_grad()
+def eval_pck_freihand_multi(model, val_loader, device: str, crop_size: int,
+                             hm_size: int, threshold_fracs: list[float],
+                             use_amp_bf16: bool) -> dict[float, float]:
+    """Multi-threshold PCK on the FreiHAND val loader. Returns
+    {frac: pck_at_that_threshold, ...}. Empty dict when no val data."""
+    out: dict[float, float] = {f: float("nan") for f in threshold_fracs}
+    if val_loader is None:
+        return out
+    model.eval()
+    thr_px = torch.tensor([f * crop_size for f in threshold_fracs],
+                          device=device)
+    total_correct = torch.zeros(len(threshold_fracs), device=device)
+    total_visible = 0.0
+    for batch in val_loader:
+        image = batch["image"].to(device, non_blocking=True)
+        gt = batch["keypoints"].to(device, non_blocking=True)
+        vis = batch["visible"].to(device, non_blocking=True)
+        if use_amp_bf16 and device == "cuda":
+            with torch.amp.autocast(device_type="cuda", dtype=torch.bfloat16):
+                pred = model(image)
+        else:
+            pred = model(image)
+        pred_xy = soft_argmax_xy(pred.float(), crop_size, hm_size)
+        diffs = (pred_xy - gt).norm(dim=-1)                          # (B, K)
+        for i, t in enumerate(thr_px):
+            correct = (diffs <= t).float() * vis
+            total_correct[i] += correct.sum()
+        total_visible += float(vis.sum().item())
+    if total_visible <= 0:
+        return out
+    for i, frac in enumerate(threshold_fracs):
+        out[frac] = float(total_correct[i].item()) / total_visible
+    return out
+
+
+@torch.no_grad()
 def eval_pck_freihand(model, val_loader, device: str, crop_size: int,
                       hm_size: int, threshold_frac: float,
                       use_amp_bf16: bool) -> float:
-    """Mean PCK across the FreiHAND val loader. Visibility-weighted across
-    the 21 hand keypoints; returns NaN when no val data is available."""
+    """Single-threshold PCK back-compat wrapper around the multi-threshold
+    eval. Kept so the legacy v1 config still loads."""
+    multi = eval_pck_freihand_multi(model, val_loader, device, crop_size,
+                                     hm_size, [threshold_frac], use_amp_bf16)
+    val = multi.get(threshold_frac, float("nan"))
+    if val == val:  # not NaN
+        return val
     if val_loader is None:
         return float("nan")
     model.eval()

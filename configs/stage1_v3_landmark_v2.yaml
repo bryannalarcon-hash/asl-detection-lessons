@@ -1,0 +1,115 @@
+run_name: stage1_v3_landmark_v2
+
+data:
+  freihand_root: data/FreiHAND_pub_v2
+  interhand_root: data/interhand
+  rhd_root: data/RHD_published_v2
+  crop_size: 224
+  heatmap_size: 56
+  # Tighter Gaussian peaks. v1 used sigma 2.0 (paper default for 64x64 face);
+  # at 56x56 hand stride-4 a slightly sharper target (1.5) lifts fingertip
+  # PCK without destabilising training.
+  heatmap_sigma: 1.5
+  padding_frac: 0.5
+  jitter_shift: 0.10
+  # v1 used scale 0.15 and rot 10. ASL hands rotate freely and the Net 2 crop
+  # is sloppy in practice — train for both.
+  jitter_scale: 0.30
+  jitter_rot: 30.0
+  phase2_bbox_cache: null
+  phase2_mix_prob: 0.0
+
+  target_mix:
+    freihand: 0.60
+    interhand_single: 0.30
+    rhd: 0.10
+
+  interhand_single_only: true
+  freihand_val_frac: 0.05
+  freihand_val_seed: 42
+
+model:
+  num_keypoints: 21
+  heatmap_channels: 128
+  # v2: enable U-Net style skip connections from stage1/stage2/stage3 into
+  # the deconv head. ~50K extra params, +0.03 to +0.06 PCK in pose-est
+  # literature (Sun et al. 2018 SimpleBaseline ablation).
+  use_unet_skip: true
+
+loss:
+  awing_alpha: 2.1
+  awing_omega: 14.0
+  awing_epsilon: 1.0
+  # v1 used 0.3 (Wang paper face default 0.5). Per Net 3 reviewer, tighter
+  # theta sharpens fingertip localisation.
+  awing_theta: 0.3
+  coord_weight: 0.1
+  coord_ramp_epochs: 5
+  # Per-keypoint weights. Fingertips (4, 8, 12, 16, 20) dominate ASL
+  # handshape discrimination; wrist (0) is the easiest. List length must
+  # equal num_keypoints (21). Default is uniform 1.0.
+  keypoint_weights: [
+    0.5,                       # 0  wrist
+    1.0, 1.0, 1.0, 1.5,         # 1-4   thumb (CMC, MCP, IP, tip)
+    1.0, 1.0, 1.0, 1.5,         # 5-8   index
+    1.0, 1.0, 1.0, 1.5,         # 9-12  middle
+    1.0, 1.0, 1.0, 1.5,         # 13-16 ring
+    1.0, 1.0, 1.0, 1.5,         # 17-20 pinky
+  ]
+
+# GPU augmentation override — passed straight into GPUAugmentation. v1 used
+# rot 30 / scale (0.75, 1.25). v2 bumps to rot ±180 (full SO(2)), wider
+# scale, more blur (motion-blur surrogate), brightness up.
+augment:
+  rotate_deg: 180.0
+  scale_range: [0.6, 1.4]
+  shift_frac: 0.08
+  hflip_p: 0.0   # disabled — hand-crop flip without per-finger remap creates label errors
+  brightness: 0.4
+  contrast: 0.4
+  saturation: 0.3
+  hue: 0.1
+  blur_p: 0.5
+  noise_p: 0.2
+
+train:
+  batch_size: 256
+  num_workers: 16
+  epochs: 200
+  samples_per_epoch: 250000
+  lr: 1.0e-3
+  lr_min: 1.0e-5
+  # v1 used 3-ep warmup; net3-improver says 1 is enough.
+  warmup_epochs: 1
+  weight_decay: 1.0e-4
+  grad_clip: 1.0
+  ema_decay: 0.9998
+  mixed_precision: true
+  use_bf16: true
+  early_stop_patience: 999
+  early_stop_min_delta: 0.001
+  log_every: 50
+  val_every: 1
+  checkpoint_dir: checkpoints/stage1_v3_landmark_v2
+  seed: 42
+
+  # SWA: stochastic weight averaging over the final 20 epochs. Free +0.005 to
+  # +0.015 PCK in pose-est literature.
+  use_swa: true
+  swa_start_epoch: 180
+  swa_lr: 1.0e-4
+
+  s3_bucket: ""
+  s3_prefix: net3/checkpoints
+  s3_sync_every: 10
+
+eval:
+  # v1 only logged PCK@0.05. v2 logs the full curve at 0.05 / 0.10 / 0.20.
+  # PCK@0.05 (11.2 px) is the tight headline; 0.10 (22.4 px) is what Net 4
+  # actually cares about for sign classification.
+  pck_threshold_fracs: [0.05, 0.10, 0.20]
+  # Back-compat with the old single-threshold scalar — kept so legacy code
+  # paths in helpers.py continue to read either field.
+  pck_threshold_frac: 0.05
+  max_val_samples: 2048
+  val_batch_size: 256

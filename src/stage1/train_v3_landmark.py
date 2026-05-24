@@ -174,8 +174,11 @@ def main() -> None:
     model = HandLandmarkNet(
         num_keypoints=deep_get(cfg, "model.num_keypoints", 21),
         heatmap_channels=deep_get(cfg, "model.heatmap_channels", 128),
+        use_unet_skip=bool(deep_get(cfg, "model.use_unet_skip", False)),
     ).to(device)
-    print(f"[init] HandLandmarkNet params={count_params(model):,}", flush=True)
+    print(f"[init] HandLandmarkNet params={count_params(model):,} "
+          f"unet_skip={bool(deep_get(cfg, 'model.use_unet_skip', False))}",
+          flush=True)
 
     # Resume from a previous checkpoint if specified (Phase 2 case).
     resume_from = deep_get(cfg, "train.resume_from")
@@ -192,6 +195,7 @@ def main() -> None:
         awing_theta=deep_get(cfg, "loss.awing_theta", 0.5),
         coord_weight=deep_get(cfg, "loss.coord_weight", 0.1),
         coord_ramp_epochs=deep_get(cfg, "loss.coord_ramp_epochs", 5),
+        keypoint_weights=deep_get(cfg, "loss.keypoint_weights"),
     )
     optimizer = AdamW(model.parameters(), lr=deep_get(cfg, "train.lr"),
                       weight_decay=deep_get(cfg, "train.weight_decay"))
@@ -209,7 +213,22 @@ def main() -> None:
     ema = AveragedModel(model, multi_avg_fn=get_ema_multi_avg_fn(
         deep_get(cfg, "train.ema_decay", 0.9998)))
 
-    gpu_aug = GPUAugmentation(image_size=deep_get(cfg, "data.crop_size", 224))
+    # Allow each augment knob to be overridden via the config's `augment`
+    # block — falls back to GPUAugmentation defaults when missing.
+    aug_cfg = (cfg.get("augment") if isinstance(cfg, dict) else None) or {}
+    gpu_aug = GPUAugmentation(
+        image_size=deep_get(cfg, "data.crop_size", 224),
+        rotate_deg=float(aug_cfg.get("rotate_deg", 30.0)),
+        scale_range=tuple(aug_cfg.get("scale_range", (0.75, 1.25))),
+        shift_frac=float(aug_cfg.get("shift_frac", 0.08)),
+        hflip_p=float(aug_cfg.get("hflip_p", 0.5)),
+        brightness=float(aug_cfg.get("brightness", 0.3)),
+        contrast=float(aug_cfg.get("contrast", 0.3)),
+        saturation=float(aug_cfg.get("saturation", 0.3)),
+        hue=float(aug_cfg.get("hue", 0.1)),
+        blur_p=float(aug_cfg.get("blur_p", 0.2)),
+        noise_p=float(aug_cfg.get("noise_p", 0.2)),
+    )
 
     ckpt_dir = Path(deep_get(cfg, "train.checkpoint_dir"))
     ckpt_dir.mkdir(parents=True, exist_ok=True)
