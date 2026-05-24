@@ -187,7 +187,7 @@ export PATH=$HOME/.local/bin:$PATH; set -a; source .env.local; set +a
 vastai search offers 'reliability >= 0.99 gpu_name=RTX_5090 num_gpus=1' \
   --order 'dph_total' --raw -o 'dph_total' | head -10
 # Provision
-vastai create instance <offer_id> --image vastai/pytorch:2.4.0-cuda-12.1.1-base \
+vastai create instance <offer_id> --image pytorch/pytorch:2.7.0-cuda12.8-cudnn9-devel \
   --disk 200 --label asl-net3-v2 --ssh
 # Wait for ready
 vastai show instance <inst_id> --raw  # check actual_status == 'running'
@@ -331,7 +331,7 @@ agent should NOT re-litigate the architecture choice — proceed.
 export PATH=$HOME/.local/bin:$PATH; set -a; source .env.local; set +a
 vastai search offers 'reliability>=0.99 gpu_name=RTX_5090 num_gpus=1' \
   --order 'dph_total' --raw -o 'dph_total' | head -5
-vastai create instance <OFFER> --image vastai/pytorch:2.4.0-cuda-12.1.1-base \
+vastai create instance <OFFER> --image pytorch/pytorch:2.7.0-cuda12.8-cudnn9-devel \
   --disk 200 --label asl-net3-v2 --ssh
 
 # After 'running': get host/port

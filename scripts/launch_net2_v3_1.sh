@@ -102,7 +102,7 @@ echo "      picked offer $OFFER_ID"
 # --- Provision. -----------------------------------------------------------
 echo "[3/8] provisioning instance"
 CREATE_JSON=$(vastai create instance "$OFFER_ID" \
-    --image pytorch/pytorch:2.5.1-cuda12.4-cudnn9-devel \
+    --image pytorch/pytorch:2.7.0-cuda12.8-cudnn9-devel \
     --disk 220 \
     --label "$VAST_LABEL" \
     --onstart-cmd "touch /workspace/.ready" \
