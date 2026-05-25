@@ -73,3 +73,7 @@ ruvector.db
 # Editor / OS
 *.tmp
 *.bak
+
+# ephemeral training-round pod state (host/port/secrets)
+.round_env
+.remote_env

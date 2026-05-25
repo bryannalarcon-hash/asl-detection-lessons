@@ -161,7 +161,8 @@ def main() -> None:
     pd = sub.add_parser("deploy")
     pd.add_argument("--gpu", default="NVIDIA GeForce RTX 5090")
     pd.add_argument("--disk", type=int, default=220)
-    pd.add_argument("--image", default="pytorch/pytorch:2.7.0-cuda12.8-cudnn9-devel")
+    pd.add_argument("--image",
+                    default="runpod/pytorch:2.8.0-py3.11-cuda12.8.1-cudnn-devel-ubuntu22.04")
     pd.add_argument("--pubkey", default="~/.ssh/vast_v3.pub")
     pd.add_argument("--name", default="asl-train")
     pd.add_argument("--secure", action="store_true", help="use SECURE cloud (pricier)")
