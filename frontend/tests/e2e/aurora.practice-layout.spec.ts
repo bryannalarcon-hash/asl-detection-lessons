@@ -4,34 +4,20 @@ import { signInViaDevBypass } from './_helpers';
 /**
  * Aurora practice screen layout.
  *
- * - The three drill pill tabs render (handshape, movement, sign).
- * - The first tab carries the active state via data-state="active".
- * - The rep counter and Continue CTA both render with their Aurora labels.
+ * The lesson plan presents only the full-sign stage, so the multi-stage drill
+ * pill row is hidden. The rep counter and advance CTA still render.
  */
 
-test('practice renders three drill pill tabs with handshape active first', async ({ page }) => {
+test('practice hides the multi-stage drill indicator for the full-sign plan', async ({ page }) => {
   await signInViaDevBypass(page);
   await page.goto('/lessons/lesson-1/practice');
   await expect(page.locator('[data-testid="page-practice"]')).toBeVisible();
 
-  const handshape = page.locator('[data-testid="drill-tab-handshape"]');
-  const movement = page.locator('[data-testid="drill-tab-movement"]');
-  const sign = page.locator('[data-testid="drill-tab-sign"]');
-
-  await expect(handshape).toBeVisible();
-  await expect(movement).toBeVisible();
-  await expect(sign).toBeVisible();
-
-  // Active drill is the first one (handshape). DrillIndicator exposes
-  // data-state="active" on the active tab plus data-active="true" on its dot.
-  await expect(handshape).toHaveAttribute('data-state', 'active');
-  await expect(page.locator('[data-testid="drill-dot-handshape"]')).toHaveAttribute(
-    'data-active',
-    'true',
-  );
+  // With a single full-sign stage per sign, the pill row is not rendered.
+  await expect(page.locator('[data-testid="drill-indicator"]')).toHaveCount(0);
 });
 
-test('practice surfaces rep counter and Continue CTA', async ({ page }) => {
+test('practice surfaces rep counter and advance CTA', async ({ page }) => {
   await signInViaDevBypass(page);
   await page.goto('/lessons/lesson-1/practice');
 
@@ -42,6 +28,6 @@ test('practice surfaces rep counter and Continue CTA', async ({ page }) => {
 
   const gotIt = page.locator('[data-testid="self-report-got-it"]');
   await expect(gotIt).toBeVisible();
-  // SelfReportRow defaults to "Continue →".
-  await expect(gotIt).toHaveText(/continue|next/i);
+  // First rep of a multi-rep sign reads "Next rep (...)".
+  await expect(gotIt).toHaveText(/next rep/i);
 });

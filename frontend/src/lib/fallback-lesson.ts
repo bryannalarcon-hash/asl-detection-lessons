@@ -17,20 +17,12 @@ export const FALLBACK_SIGNS: PracticeSign[] = [
     id: '00000000-0000-0000-0000-000000000001',
     slug: 'mom',
     englishGloss: 'MOM',
-    drills: [
-      { drillType: 'handshape', target: '5' },
-      { drillType: 'movement', target: 'chin-tap' },
-      { drillType: 'sign', target: 'MOM' },
-    ],
+    drills: [{ drillType: 'sign', target: 'MOM' }],
   },
   {
     id: '00000000-0000-0000-0000-000000000002',
     slug: 'dad',
     englishGloss: 'DAD',
-    drills: [
-      { drillType: 'handshape', target: '5' },
-      { drillType: 'movement', target: 'forehead-tap' },
-      { drillType: 'sign', target: 'DAD' },
-    ],
+    drills: [{ drillType: 'sign', target: 'DAD' }],
   },
 ];

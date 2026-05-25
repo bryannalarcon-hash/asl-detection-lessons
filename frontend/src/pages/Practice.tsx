@@ -38,19 +38,46 @@ import {
 } from '@/lib/practice-resume';
 import type { DrillType } from '@/cv/types';
 
+/**
+ * Build practice signs from backend data. The lesson plan presents only the
+ * full-sign stage, so the handshape/movement drills are dropped here and each
+ * sign keeps exactly one drill (`drillType === 'sign'`). When the backend
+ * omits a sign drill, the first available drill is retargeted as the sign so
+ * the sign still has a stage to run.
+ */
 function buildSignsFromBackend(
   signs: { id: string; slug: string; englishGloss: string }[],
   drills: { signId: string; drillType: DrillType; targetString: string; orderIndex: number }[]
 ): PracticeSign[] {
-  return signs.map((sign) => ({
-    id: sign.id,
-    slug: sign.slug,
-    englishGloss: sign.englishGloss,
-    drills: drills
+  return signs.map((sign) => {
+    const signDrills = drills
       .filter((d) => d.signId === sign.id)
       .sort((a, b) => a.orderIndex - b.orderIndex)
-      .map((d) => ({ drillType: d.drillType, target: d.targetString })),
-  }));
+      .map((d) => ({ drillType: d.drillType, target: d.targetString }));
+    return {
+      id: sign.id,
+      slug: sign.slug,
+      englishGloss: sign.englishGloss,
+      drills: toFullSignDrills(signDrills, sign.englishGloss),
+    };
+  });
+}
+
+/**
+ * Collapse a sign's drill list to a single full-sign drill. Prefers the
+ * existing `sign` stage (carrying any reps/segment overlay); falls back to the
+ * first drill retargeted as the sign, or a synthesized drill when the list is
+ * empty, so every sign always has exactly one stage to practice.
+ */
+function toFullSignDrills(
+  drills: PracticeSign['drills'],
+  englishGloss: string
+): PracticeSign['drills'] {
+  const signDrill = drills.find((d) => d.drillType === 'sign');
+  if (signDrill) return [signDrill];
+  const first = drills[0];
+  if (first) return [{ ...first, drillType: 'sign' }];
+  return [{ drillType: 'sign', target: englishGloss }];
 }
 
 /**
@@ -206,7 +233,7 @@ export default function PracticePage() {
   // Per-sign reps from the dev overlay (falls back to the machine default).
   const repsForCurrentSign = effectiveReps(state.context);
   const drillTypes = useMemo<DrillType[]>(
-    () => currentSign?.drills.map((d) => d.drillType) ?? ['handshape', 'movement', 'sign'],
+    () => currentSign?.drills.map((d) => d.drillType) ?? ['sign'],
     [currentSign]
   );
 
@@ -260,15 +287,11 @@ export default function PracticePage() {
     prevSignGlossRef.current = currentSign?.englishGloss ?? null;
   }, [state.context.signIndex, currentSign]);
 
-  // CTA label by state: stage 0-1 → "Continue →", stage 2 with reps left →
-  // "Next rep (X of 3) →", final stage final rep → "Next sign →" / "Finish lesson ✓".
+  // CTA label: within-sign rep advances read "Next rep (X of N) →"; the last
+  // rep of a sign (next press starts a new word) reads "Continue →".
   const continueLabel = computeContinueLabel({
-    drillIndex: state.context.drillIndex,
-    drillTotal: drillTypes.length,
     repIndex: state.context.repIndex,
     repTotal: repsForCurrentSign,
-    signIndex: state.context.signIndex,
-    signTotal: state.context.signs.length,
   });
 
   // Restart sign — clear progress on the current sign without losing position.
@@ -327,8 +350,8 @@ export default function PracticePage() {
           </section>
         )}
 
-        {/* 3-stage pill tabs */}
-        {currentDrill && (
+        {/* Stage pill tabs — hidden when a sign has a single (full-sign) stage. */}
+        {currentDrill && drillTypes.length > 1 && (
           <section className="mb-7">
             <DrillIndicator current={currentDrill.drillType} drills={drillTypes} />
           </section>
@@ -434,32 +457,24 @@ export default function PracticePage() {
   );
 }
 
+/**
+ * Advance-button label. With the full-sign-only plan a sign has one drill, so
+ * a drill transition is a word transition. If reps remain in the current sign
+ * the next press advances a rep -> "Next rep (X of N) →". On the last rep the
+ * next press moves to a different word -> "Continue →".
+ */
 function computeContinueLabel({
-  drillIndex,
-  drillTotal,
   repIndex,
   repTotal,
-  signIndex,
-  signTotal,
 }: {
-  drillIndex: number;
-  drillTotal: number;
   repIndex: number;
   repTotal: number;
-  signIndex: number;
-  signTotal: number;
 }): string {
-  const isLastDrill = drillIndex >= drillTotal - 1;
   const isLastRep = repIndex >= repTotal - 1;
-  const isLastSign = signIndex >= signTotal - 1;
-
-  if (!isLastDrill) return 'Continue →';
-  // Last drill: next click either advances rep or moves to next sign.
   if (!isLastRep) {
     return `Next rep (${repIndex + 2} of ${repTotal}) →`;
   }
-  if (!isLastSign) return 'Next sign →';
-  return 'Finish lesson ✓';
+  return 'Continue →';
 }
 
 function CameraPanelWrapper({

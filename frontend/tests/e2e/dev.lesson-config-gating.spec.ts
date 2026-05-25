@@ -63,9 +63,10 @@ test.describe('dev lesson-config gating (default ON)', () => {
     await page.goto('/dev/lesson-config');
     await expect(page.locator('[data-testid="page-dev-lesson-config"]')).toBeVisible();
 
-    // Set the first sign's handshape-stage reps to 5 and save. Practice opens on
-    // the handshape stage, so the rep counter denominator should become 5.
-    const reps = page.locator('[data-testid="dev-stage-reps-handshape"]').first();
+    // Set the first sign's full-sign-stage reps to 5 and save. The lesson plan
+    // presents only the full sign, so practice opens on that stage and the rep
+    // counter denominator should become 5.
+    const reps = page.locator('[data-testid="dev-stage-reps-sign"]').first();
     await reps.fill('5');
     await page.locator('[data-testid="dev-lesson-config-save"]').click();
     await expect(page.locator('[data-testid="dev-lesson-config-saved"]')).toBeVisible();

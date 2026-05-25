@@ -2,26 +2,20 @@ import { describe, it, expect } from 'vitest';
 import { createActor } from 'xstate';
 import { practiceMachine, type PracticeSign } from '@/lib/machines/practice';
 
+// The lesson plan presents one drill per sign: the full sign, repeated for the
+// sign's rep count. Fixtures mirror that single-drill-per-sign shape.
 const SAMPLE_SIGNS: PracticeSign[] = [
   {
     id: 'sign-1',
     slug: 'hello',
     englishGloss: 'HELLO',
-    drills: [
-      { drillType: 'handshape', target: 'flat-B' },
-      { drillType: 'movement', target: 'forward-arc' },
-      { drillType: 'sign', target: 'HELLO' },
-    ],
+    drills: [{ drillType: 'sign', target: 'HELLO' }],
   },
   {
     id: 'sign-2',
     slug: 'thank-you',
     englishGloss: 'THANK_YOU',
-    drills: [
-      { drillType: 'handshape', target: 'flat-B' },
-      { drillType: 'movement', target: 'forward-arc' },
-      { drillType: 'sign', target: 'THANK_YOU' },
-    ],
+    drills: [{ drillType: 'sign', target: 'THANK_YOU' }],
   },
 ];
 
@@ -86,28 +80,13 @@ describe('practiceMachine', () => {
     expect(actor.getSnapshot().value).toBe('PROMPT_SHOWN');
   });
 
-  it('advances drillIndex after 3 passes on handshape', () => {
+  it('advances to next sign after 3 passes on the sign drill', () => {
     const actor = spawn();
     actor.send({ type: 'START' });
     actor.send({ type: 'PROMPT_READY' });
-    // 3 passes complete the handshape drill (drillIndex 0 → 1, movement).
-    passOneRep(actor);
-    passOneRep(actor);
-    passOneRep(actor);
-    const ctx = actor.getSnapshot().context;
-    expect(ctx.drillIndex).toBe(1);
-    expect(ctx.repIndex).toBe(0);
-  });
-
-  it('advances to next sign after 3 passes on the final sign drill', () => {
-    const actor = spawn();
-    actor.send({ type: 'START' });
-    actor.send({ type: 'PROMPT_READY' });
-    // Complete all 3 drills × 3 reps for sign 0.
-    for (let drill = 0; drill < 3; drill++) {
-      for (let rep = 0; rep < 3; rep++) {
-        passOneRep(actor);
-      }
+    // Each sign has a single drill, so 3 reps complete sign 0.
+    for (let rep = 0; rep < 3; rep++) {
+      passOneRep(actor);
     }
     const ctx = actor.getSnapshot().context;
     expect(ctx.signIndex).toBe(1);
@@ -115,23 +94,33 @@ describe('practiceMachine', () => {
     expect(ctx.repIndex).toBe(0);
   });
 
+  it('stays on the single drill across reps (drillIndex never advances)', () => {
+    const actor = spawn();
+    actor.send({ type: 'START' });
+    actor.send({ type: 'PROMPT_READY' });
+    passOneRep(actor);
+    expect(actor.getSnapshot().context.drillIndex).toBe(0);
+    expect(actor.getSnapshot().context.repIndex).toBe(1);
+    passOneRep(actor);
+    expect(actor.getSnapshot().context.drillIndex).toBe(0);
+    expect(actor.getSnapshot().context.repIndex).toBe(2);
+  });
+
   it('reaches LESSON_COMPLETE after the last sign finishes', () => {
     const actor = spawn();
     actor.send({ type: 'START' });
     actor.send({ type: 'PROMPT_READY' });
-    // Two signs × 3 drills × 3 reps = 18 passes
+    // Two signs × 1 drill × 3 reps = 6 passes
     for (let sign = 0; sign < SAMPLE_SIGNS.length; sign++) {
-      for (let drill = 0; drill < 3; drill++) {
-        for (let rep = 0; rep < 3; rep++) {
-          passOneRep(actor);
-        }
+      for (let rep = 0; rep < 3; rep++) {
+        passOneRep(actor);
       }
     }
     expect(actor.getSnapshot().value).toBe('LESSON_COMPLETE');
     expect(actor.getSnapshot().status).toBe('done');
   });
 
-  it('SKIP_DRILL from SELF_REPORT advances drill without completing reps', () => {
+  it('SKIP_DRILL from SELF_REPORT completes the sign and advances to the next', () => {
     const actor = spawn();
     actor.send({ type: 'START' });
     actor.send({ type: 'PROMPT_READY' });
@@ -141,8 +130,10 @@ describe('practiceMachine', () => {
     // We're now in SELF_REPORT.
     expect(actor.getSnapshot().value).toBe('SELF_REPORT');
     actor.send({ type: 'SKIP_DRILL' });
-    // Should land back in PROMPT_SHOWN for the next drill.
-    expect(actor.getSnapshot().context.drillIndex).toBe(1);
+    // The sign has a single drill, so skipping it finishes the sign and lands
+    // on PROMPT_SHOWN of the next sign at rep 0.
+    expect(actor.getSnapshot().context.signIndex).toBe(1);
+    expect(actor.getSnapshot().context.drillIndex).toBe(0);
     expect(actor.getSnapshot().context.repIndex).toBe(0);
   });
 

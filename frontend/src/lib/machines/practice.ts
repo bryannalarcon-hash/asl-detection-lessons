@@ -1,5 +1,7 @@
 // XState v5 practice machine. See docs/ux-spec.md §"Hierarchy of state machines".
-// Lesson → Sign → Drill → Rep. Drill cycle: handshape → movement → sign. 3 reps each.
+// Lesson → Sign → Drill → Rep. The lesson plan presents one drill per sign (the
+// full sign), repeated for that sign's rep count. The Drill level is retained so
+// the machine and per-stage overlay structure stay intact.
 import { setup, assign } from 'xstate';
 import type { DrillType } from '@/cv/types';
 

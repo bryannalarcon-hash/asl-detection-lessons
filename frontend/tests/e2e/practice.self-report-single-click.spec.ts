@@ -33,12 +33,13 @@ test('clicking I got it once advances the rep counter', async ({ page }) => {
 });
 
 /**
- * Same setup, but click I got it nine times (3 reps per drill × 3 drills).
- * Verify that EVERY click advances some piece of state — no stuck stages.
- * If the user's report "buttons stop working at some stage" is real, this
- * test catches the dead transition.
+ * Same setup, but click I got it through a full sign's reps and into the next
+ * word. The lesson plan presents only the full sign per word (no handshape /
+ * movement stages), so every click advances a rep until the sign's last rep,
+ * after which the next click moves to a new word. Verify EVERY click advances
+ * some piece of state — no stuck stages.
  */
-test('clicking I got it nine times walks through all three drills', async ({ page }) => {
+test('clicking I got it walks through a sign\'s reps and on to the next word', async ({ page }) => {
   await signInViaDevBypass(page);
   await page.goto('/lessons/lesson-1');
   await page.locator('[data-testid="lesson-start"]').click();
@@ -46,48 +47,36 @@ test('clicking I got it nine times walks through all three drills', async ({ pag
 
   const gotIt = page.locator('[data-testid="self-report-got-it"]');
   const repCounter = page.locator('[data-testid="rep-counter"]');
-  const dotHandshape = page.locator('[data-testid="drill-dot-handshape"]');
-  const dotMovement = page.locator('[data-testid="drill-dot-movement"]');
-  const dotSign = page.locator('[data-testid="drill-dot-sign"]');
+  const title = page.locator('[data-testid="page-practice"] h1').first();
 
-  // Start: handshape, rep 1 of 3
-  await expect(dotHandshape).toHaveAttribute('data-active', 'true');
+  // The multi-stage pill row is hidden under the full-sign-only plan.
+  await expect(page.locator('[data-testid="drill-indicator"]')).toHaveCount(0);
 
-  // Reps 1–3 of handshape
+  // Start: rep 1 of 3 on the first word.
+  await expect(repCounter).toHaveText(/1.*(of|\/).*3/i);
+  const firstWord = (await title.textContent())?.trim() ?? '';
+
+  // Within-sign rep advances read "Next rep".
+  await expect(gotIt).toHaveText(/next rep/i);
   await gotIt.click();
   await expect(repCounter).toHaveText(/2.*(of|\/).*3/i, { timeout: 1_000 });
   await gotIt.click();
   await expect(repCounter).toHaveText(/3.*(of|\/).*3/i, { timeout: 1_000 });
-  await gotIt.click();
-  // After the third pass, drill advances to movement
-  await expect(dotMovement).toHaveAttribute('data-active', 'true', { timeout: 1_000 });
-  await expect(repCounter).toHaveText(/1.*(of|\/).*3/i, { timeout: 1_000 });
 
-  // Reps 1–3 of movement
-  await gotIt.click();
-  await expect(repCounter).toHaveText(/2.*(of|\/).*3/i, { timeout: 1_000 });
-  await gotIt.click();
-  await expect(repCounter).toHaveText(/3.*(of|\/).*3/i, { timeout: 1_000 });
-  await gotIt.click();
-  await expect(dotSign).toHaveAttribute('data-active', 'true', { timeout: 1_000 });
-  await expect(repCounter).toHaveText(/1.*(of|\/).*3/i, { timeout: 1_000 });
-
-  // Reps 1–3 of sign → next sign or lesson-complete navigation
-  await gotIt.click();
-  await expect(repCounter).toHaveText(/2.*(of|\/).*3/i, { timeout: 1_000 });
-  await gotIt.click();
-  await expect(repCounter).toHaveText(/3.*(of|\/).*3/i, { timeout: 1_000 });
+  // Last rep of the word: the next press starts a new word -> "Continue".
+  await expect(gotIt).toHaveText(/continue/i);
   await gotIt.click();
 
-  // We either advance to next sign (handshape active again with rep 1) or land on complete.
+  // Either we advanced to the next word (rep 1 again, different title) or landed
+  // on the lesson-complete page.
   await page.waitForTimeout(400);
   const url = page.url();
   if (url.includes('/complete')) {
     await expect(page.locator('[data-testid="page-lesson-complete"]')).toBeVisible();
   } else {
-    // Next sign: drill should reset to handshape, rep to 1
-    await expect(dotHandshape).toHaveAttribute('data-active', 'true');
     await expect(repCounter).toHaveText(/1.*(of|\/).*3/i);
+    const nextWord = (await title.textContent())?.trim() ?? '';
+    expect(nextWord).not.toBe(firstWord);
   }
 });
 
