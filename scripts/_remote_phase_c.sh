@@ -54,9 +54,17 @@ for sign in "${SIGNS[@]}"; do
     fi
     echo "[phasec] $(date -u) $sign : download"
     rm -rf "work/${sign}"
-    if ! curl -s --max-time 1800 "$url" | tar -xf - -C work/ 2>>logs/phasec.log; then
-        echo "[phasec] WARN $sign download/extract failed; skipping"; rm -rf "work/${sign}"; continue
+    tarf="work/${sign}.tar"
+    # Download to a file with resume (-C -) + retries: PopSign tars are multi-GB
+    # and a streamed "curl | tar" loses the whole sign on any mid-stream drop.
+    if ! curl -sf -C - --retry 6 --retry-delay 5 --retry-all-errors \
+            --max-time 3600 -o "$tarf" "$url" 2>>logs/phasec.log; then
+        echo "[phasec] WARN $sign download failed after retries; skipping"; rm -f "$tarf"; continue
     fi
+    if ! tar -xf "$tarf" -C work/ 2>>logs/phasec.log; then
+        echo "[phasec] WARN $sign extract failed; skipping"; rm -rf "$tarf" "work/${sign}"; continue
+    fi
+    rm -f "$tarf"
     python3 scripts/build_clip_manifest.py --work-dir work --signs "$sign" \
         --out "work/${sign}.jsonl" --max-per-sign "$MAX_PER_SIGN" 2>&1 | tee -a logs/phasec.log
     python3 -m src.stage2.data.extract_keypoints \
