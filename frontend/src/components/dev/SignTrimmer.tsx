@@ -145,11 +145,12 @@ export function SignTrimmer({
             src={src}
             muted
             playsInline
+            controls
             onError={handleError}
             onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
             onTimeUpdate={handleTimeUpdate}
             data-testid="dev-sign-video"
-            className="aspect-[4/3] w-full rounded border border-border bg-bg-deep object-cover"
+            className="aspect-[4/3] w-full rounded border border-border bg-bg-deep object-contain"
           />
 
           <input
