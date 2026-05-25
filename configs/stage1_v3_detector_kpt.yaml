@@ -67,6 +67,10 @@ anchors:
 train:
   batch_size: 256
   num_workers: 32
+  # n_kpts>0 forces the numpy anchor matcher (numba/GPU paths emit no kpt
+  # targets), so cap samples/epoch to keep each epoch a few minutes rather
+  # than full-dataset-long. ~780 steps/epoch at batch 256.
+  samples_per_epoch: 200000
   # Defaults below are overridden per --stage from curriculum.<stage>.
   # They exist so a plain (stage-less) `load_config` smoke test succeeds.
   epochs: 40
@@ -89,14 +93,14 @@ curriculum:
   stage_a:
     description: hagrid-only pretrain — easy regime, learn hand shape priors
     sources: [hagrid]
-    epochs: 40
+    epochs: 25
     lr: 1.0e-3
     init_from: null
     checkpoint_dir: checkpoints/stage1_v3_detector_kpt/stage_a
   stage_b:
     description: balanced mix finetune — small hands in full-body scenes
     sources: [coco_wholebody, hagrid, egohands, freihand, synthetic]
-    epochs: 30
+    epochs: 20
     lr: 1.0e-4
     init_from: checkpoints/stage1_v3_detector_kpt/stage_a/best.pt
     checkpoint_dir: checkpoints/stage1_v3_detector_kpt/stage_b

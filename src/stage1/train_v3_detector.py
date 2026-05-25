@@ -274,9 +274,14 @@ def main() -> None:
         shuffle_flag = True
         if target_mix and not args.data_limit:
             weights, active_mix = build_mix_sample_weights(train_ds, target_mix)
+            # Cap samples drawn per epoch so the (forced) numpy anchor matcher
+            # under n_kpts>0 does not make each epoch full-dataset-long. Falls
+            # back to the full dataset size when unset.
+            n_per_epoch = int(deep_get(cfg, "train.samples_per_epoch",
+                                       len(train_ds)) or len(train_ds))
             sampler = WeightedRandomSampler(
                 weights=torch.as_tensor(weights, dtype=torch.double),
-                num_samples=len(train_ds),
+                num_samples=n_per_epoch,
                 replacement=True,
             )
             shuffle_flag = False

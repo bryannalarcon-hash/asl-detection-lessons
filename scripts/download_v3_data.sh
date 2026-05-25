@@ -9,18 +9,24 @@
 #   - unzip installed via apt
 set -euo pipefail
 
-# --net2-only skips InterHand2.6M (Net-3-only, ~80GB)
+# --net2-only skips InterHand2.6M (Net-3-only, ~80GB).
+# --net3-only fetches ONLY Net 3 sources (FreiHAND + InterHand + RHD) and
+#   skips COCO/HaGRID/EgoHands/MPII/synthetic — so a Net-3 pod never aborts on
+#   HaGRID's FATAL reorg checks for data it does not need.
 NET2_ONLY=0
-if [ "${1:-}" = "--net2-only" ]; then
-    NET2_ONLY=1
-    echo "[download] --net2-only set: skipping InterHand2.6M"
-fi
+NET3_ONLY=0
+case "${1:-}" in
+    --net2-only) NET2_ONLY=1; echo "[download] --net2-only: skipping InterHand2.6M" ;;
+    --net3-only) NET3_ONLY=1; echo "[download] --net3-only: FreiHAND + InterHand + RHD only" ;;
+esac
 
 DATA_DIR="${DATA_DIR:-data}"
 mkdir -p "$DATA_DIR/coco/annotations" "$DATA_DIR/hagrid"
 
 # ----- COCO -----
-if [ -f "$DATA_DIR/coco/annotations/coco_wholebody_train_v1.0.json" ] \
+if [ "$NET3_ONLY" = "1" ]; then
+    echo "=== COCO-WholeBody: skipped (--net3-only) ==="
+elif [ -f "$DATA_DIR/coco/annotations/coco_wholebody_train_v1.0.json" ] \
    && [ -d "$DATA_DIR/coco/train2017" ] \
    && [ -n "$(find "$DATA_DIR/coco/train2017" -maxdepth 1 -name '*.jpg' -print -quit 2>/dev/null)" ]; then
     echo "=== COCO-WholeBody: already present, skipping ==="
@@ -54,7 +60,9 @@ fi
 # Sber S3 mirrors are dead. Reassemble from Kaggle:
 #   - bbox annotations: kapitanov/hagrid (~1.7 GB JSONs, human-annotated bboxes)
 #   - 384p images:      innominate817/hagrid-sample-500k-384p (13.1 GB, ~500K of 552K)
-if [ -f "$DATA_DIR/hagrid/annotations/train.json" ] \
+if [ "$NET3_ONLY" = "1" ]; then
+    echo "=== HaGRID: skipped (--net3-only) ==="
+elif [ -f "$DATA_DIR/hagrid/annotations/train.json" ] \
    && [ -d "$DATA_DIR/hagrid/images/call" ] \
    && [ -n "$(find "$DATA_DIR/hagrid/images/call" -maxdepth 1 -name '*.jpg' -print -quit 2>/dev/null)" ]; then
     echo "=== HaGRID: already present, skipping ==="
@@ -191,23 +199,34 @@ fi
 # We invoke them unconditionally and rely on `set -e` to surface real failures.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-echo "=== EgoHands (Wayback IU mirror) ==="
-timeout 300 bash "$SCRIPT_DIR/download_egohands.sh" || \
-    echo "[warn] EgoHands download failed or timed out; v3.1 mix sampler will renormalize without egohands. Continuing."
+if [ "$NET3_ONLY" = "1" ]; then
+    echo "=== EgoHands / MPII: skipped (--net3-only) ==="
+else
+    echo "=== EgoHands (S3 presigned if EGOHANDS_S3_PRESIGNED_TAR set, else Wayback mirror) ==="
+    timeout 300 bash "$SCRIPT_DIR/download_egohands.sh" || \
+        echo "[warn] EgoHands download failed or timed out; v3.1 mix sampler will renormalize without egohands. Continuing."
 
-echo "=== MPII Human Pose v1.0 ==="
-bash "$SCRIPT_DIR/download_mpii.sh" || \
-    echo "[warn] MPII download failed; Net 1 v3.1 mix sampler will renormalize without it"
+    echo "=== MPII Human Pose v1.0 ==="
+    bash "$SCRIPT_DIR/download_mpii.sh" || \
+        echo "[warn] MPII download failed; Net 1 v3.1 mix sampler will renormalize without it"
+fi
 
-echo "=== RHD (Rendered Hand Pose) ==="
-timeout 600 bash "$SCRIPT_DIR/download_rhd.sh" || \
-    echo "[warn] RHD download failed or timed out; Net 3 mix sampler will renormalize without it"
+# RHD is a Net 3 source only; skip on a Net-2-only pod.
+if [ "$NET2_ONLY" = "1" ]; then
+    echo "=== RHD: skipped (--net2-only) ==="
+else
+    echo "=== RHD (S3 presigned if RHD_S3_PRESIGNED_URL set, else source) ==="
+    timeout 600 bash "$SCRIPT_DIR/download_rhd.sh" || \
+        echo "[warn] RHD download failed or timed out; Net 3 mix sampler will renormalize without it"
+fi
 
 # ----- Synthetic composites -----
 # Depends on FreiHAND + COCO being on disk; both blocks above either
 # completed or `set -e` already aborted. Builder script is idempotent.
 echo "=== Synthetic hand-in-scene composites ==="
-if [ -f "$DATA_DIR/synthetic_hands/anno.jsonl" ]; then
+if [ "$NET3_ONLY" = "1" ]; then
+    echo "  skipped (--net3-only; needs COCO)"
+elif [ -f "$DATA_DIR/synthetic_hands/anno.jsonl" ]; then
     echo "  synthetic_hands/anno.jsonl present, skipping"
 else
     python "$SCRIPT_DIR/build_synthetic_composites.py" \
