@@ -24,6 +24,9 @@ log() { printf '[%s] %s\n' "$(ts)" "$*" | tee -a "${LOG_FILE}"; }
 pulled=0
 while read -r tag role pod_id host port rdir; do
     [ "${tag:-}" = "POD" ] || continue
+    # .round_env stores the ckpt dir relative to the remote repo root; make it
+    # absolute so ls/scp work without a remote `cd` (they run from /root).
+    case "${rdir}" in /*) : ;; *) rdir="/workspace/asl/${rdir}" ;; esac
     ldir="${REPO_ROOT}/results/v3/${role}"
     mkdir -p "${ldir}"
     # -n redirects ssh stdin from /dev/null: without it, ssh consumes the
