@@ -11,6 +11,11 @@ Math is identical to `match_anchors_to_gt` + `encode_box` in `anchors.py`:
   - Box deltas: (dx,dy,dw,dh) = ((gx-ax)/aw, (gy-ay)/ah, log(gw/aw), log(gh/ah))
 
 Numerically verified equivalent within float32 precision.
+
+NOTE: this path emits only (cls, box) targets — it does NOT produce keypoint
+targets. When ``model.n_kpts > 0`` the trainer must bypass this builder and
+use the numpy ``_build_targets`` path (which calls ``build_kpt_targets``).
+The trainer enforces this; passing --use-numba-anchors with n_kpts>0 raises.
 """
 from __future__ import annotations
 

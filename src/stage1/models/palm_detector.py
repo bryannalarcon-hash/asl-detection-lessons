@@ -23,6 +23,14 @@ Two architecture variants share the same depthwise-separable backbone:
   Output (both variants): concatenated cls (B, N) and box (B, N, 4)
   tensors with N anchors stitched in P1 -> P2 -> P3 order. Optional aux
   keypoint regression head when ``n_aux_kpts > 0`` (legacy variant only).
+
+  Per-anchor keypoint regression (FPN variant) when ``n_kpts > 0``: each
+  FPN head grows a third "kpt" conv emitting ``a * n_kpts * 2`` channels per
+  cell, and the forward returns an extra ``"kpt"`` key of shape
+  (B, N, n_kpts * 2) stitched in the same P1 -> P2 -> P3 order as cls/box.
+  Keypoints are encoded as offsets from the anchor center normalized by
+  anchor size — the same convention as the box-center deltas (see
+  ``anchors.encode_kpts`` / ``anchors.decode_kpts``).
 """
 from __future__ import annotations
 
@@ -83,6 +91,13 @@ class PalmDetector(nn.Module):
             (since the head is shared). If the per-scale counts differ
             the FPN constructor falls back to per-scale heads at the
             FPN channel width.
+        n_kpts: per-anchor keypoint regression count for the FPN variant.
+            When >0 (and ``use_fpn``), each FPN head grows a "kpt" conv
+            emitting ``a * n_kpts * 2`` channels and the forward returns a
+            ``"kpt"`` key of shape (B, N, n_kpts * 2). Works with both the
+            shared head (all anchors_per_scale equal) and the per-scale
+            fallback. Ignored for the legacy non-FPN path, which keeps the
+            separate ``n_aux_kpts`` aux-keypoint head for back-compat.
     """
 
     def __init__(self,
@@ -90,12 +105,14 @@ class PalmDetector(nn.Module):
                  n_aux_kpts: int = 0,
                  use_fpn: bool = False,
                  fpn_channels: int = 64,
-                 anchors_per_scale: tuple[int, int, int] | None = None):
+                 anchors_per_scale: tuple[int, int, int] | None = None,
+                 n_kpts: int = 0):
         super().__init__()
         self.n_anchors = n_anchors_per_cell
         self.n_aux_kpts = n_aux_kpts
         self.use_fpn = use_fpn
         self.fpn_channels = fpn_channels
+        self.n_kpts = n_kpts
         if anchors_per_scale is None:
             anchors_per_scale = (n_anchors_per_cell,) * 3
         if len(anchors_per_scale) != 3:
@@ -153,15 +170,22 @@ class PalmDetector(nn.Module):
         # heads at the FPN channel width.
         if len(set(self.anchors_per_scale)) == 1:
             a = self.anchors_per_scale[0]
-            self.shared_head = nn.ModuleDict({
+            modules: dict[str, nn.Module] = {
                 "stem": _conv_bn_relu(c, c),
                 "cls": nn.Conv2d(c, a, 1),
                 "box": nn.Conv2d(c, a * 4, 1),
-            })
+            }
+            if self.n_kpts > 0:
+                # Per-anchor keypoint offsets: a anchors x n_kpts x 2 coords.
+                modules["kpt"] = nn.Conv2d(c, a * self.n_kpts * 2, 1)
+            self.shared_head = nn.ModuleDict(modules)
             self.fpn_shared_head = True
         else:
-            # Per-scale heads, but at the (smaller) FPN channel width.
-            kpt_out = 0  # aux kpts not supported in FPN variant
+            # Per-scale FPN heads at the (smaller) FPN channel width. The
+            # per-anchor keypoint regression head is added here too (kpt_out
+            # = n_kpts * 2 channels per anchor); n_aux_kpts is the legacy
+            # per-cell aux-kpt path and stays at 0 in the FPN variant.
+            kpt_out = 2 * self.n_kpts
             self.head_p1 = self._make_head(c, kpt_out, self.anchors_per_scale[0])
             self.head_p2 = self._make_head(c, kpt_out, self.anchors_per_scale[1])
             self.head_p3 = self._make_head(c, kpt_out, self.anchors_per_scale[2])
@@ -200,10 +224,20 @@ class PalmDetector(nn.Module):
         focal_bias = -torch.log(torch.tensor((1 - prior) / prior)).item()
         if self.use_fpn and self.fpn_shared_head:
             nn.init.constant_(self.shared_head["cls"].bias, focal_bias)
+            if "kpt" in self.shared_head:
+                # Regression head: small-std weights + zero bias so initial
+                # keypoint offsets sit near the anchor center.
+                nn.init.normal_(self.shared_head["kpt"].weight, std=0.01)
+                nn.init.constant_(self.shared_head["kpt"].bias, 0.0)
         else:
             for head in (self.head_p1, self.head_p2, self.head_p3):
                 cls_conv = head["cls"][-1]
                 nn.init.constant_(cls_conv.bias, focal_bias)
+                if "kpt" in head:
+                    # Per-scale FPN kpt head: small-std final conv + zero bias.
+                    kpt_conv = head["kpt"][-1]
+                    nn.init.normal_(kpt_conv.weight, std=0.01)
+                    nn.init.constant_(kpt_conv.bias, 0.0)
 
     # ------------------------------------------------------------------
     # Forward
@@ -244,24 +278,32 @@ class PalmDetector(nn.Module):
                       ) -> dict[str, torch.Tensor]:
         cls_chunks: list[torch.Tensor] = []
         box_chunks: list[torch.Tensor] = []
+        kpt_chunks: list[torch.Tensor] = []
+        emit_kpt = self.n_kpts > 0
+        kpt_per_anchor = self.n_kpts * 2
         if self.use_fpn and self.fpn_shared_head:
             head = self.shared_head
             for feat, _name in feats:
                 t = head["stem"](feat)
-                cls = head["cls"](t)
-                box = head["box"](t)
-                cls_chunks.append(self._flatten(cls, 1))
-                box_chunks.append(self._flatten(box, 4))
+                cls_chunks.append(self._flatten(head["cls"](t), 1))
+                box_chunks.append(self._flatten(head["box"](t), 4))
+                if emit_kpt:
+                    kpt_chunks.append(self._flatten(head["kpt"](t), kpt_per_anchor))
         else:
             heads = {"p1": self.head_p1, "p2": self.head_p2, "p3": self.head_p3}
             for feat, name in feats:
                 h = heads[name]
                 cls_chunks.append(self._flatten(h["cls"](feat), 1))
                 box_chunks.append(self._flatten(h["box"](feat), 4))
-        return {
+                if emit_kpt:
+                    kpt_chunks.append(self._flatten(h["kpt"](feat), kpt_per_anchor))
+        result = {
             "cls": torch.cat(cls_chunks, dim=1),  # (B, N_anchors)
             "box": torch.cat(box_chunks, dim=1),  # (B, N_anchors, 4)
         }
+        if emit_kpt:
+            result["kpt"] = torch.cat(kpt_chunks, dim=1)  # (B, N_anchors, n_kpts*2)
+        return result
 
     def _legacy_head_forward(self, p1: torch.Tensor, p2: torch.Tensor,
                              p3: torch.Tensor) -> dict[str, torch.Tensor]:
@@ -295,3 +337,41 @@ class PalmDetector(nn.Module):
 
 def count_params(model: nn.Module) -> int:
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+def _smoke() -> None:
+    """CPU smoke: build the FPN keypoint variant and print output shapes."""
+    from src.stage1.models.anchors import get_anchors
+
+    input_size = 256
+    scales = [[0.05, 0.10], [0.20, 0.35], [0.55]]
+    strides = [8, 16, 32]
+    anchors = get_anchors(input_size, scales_per_stride=scales, strides=strides)
+
+    for n_kpts in (0, 2):
+        model = PalmDetector(use_fpn=True, n_kpts=n_kpts,
+                             anchors_per_scale=(2, 2, 1))
+        model.eval()
+        with torch.no_grad():
+            out = model(torch.randn(2, 3, input_size, input_size))
+        n = out["cls"].shape[1]
+        assert n == anchors.shape[0], (n, anchors.shape[0])
+        assert out["box"].shape == (2, n, 4)
+        keys = sorted(out.keys())
+        if n_kpts > 0:
+            assert out["kpt"].shape == (2, n, n_kpts * 2)
+        print(f"[smoke] n_kpts={n_kpts} params={count_params(model):,} "
+              f"N_anchors={n} keys={keys} "
+              f"cls={tuple(out['cls'].shape)} box={tuple(out['box'].shape)}"
+              + (f" kpt={tuple(out['kpt'].shape)}" if n_kpts > 0 else ""))
+
+    # Legacy path still works.
+    legacy = PalmDetector(use_fpn=False, n_anchors_per_cell=3)
+    with torch.no_grad():
+        lout = legacy(torch.randn(1, 3, 192, 192))
+    print(f"[smoke] legacy params={count_params(legacy):,} "
+          f"keys={sorted(lout.keys())} cls={tuple(lout['cls'].shape)}")
+
+
+if __name__ == "__main__":
+    _smoke()

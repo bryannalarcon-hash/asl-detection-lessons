@@ -70,24 +70,72 @@ class SmoothL1BoxLoss(nn.Module):
         return (loss_per * pos_f).sum() / n_pos
 
 
+class KeypointRegressionLoss(nn.Module):
+    """Masked smooth-L1 on per-anchor keypoint offsets.
+
+    Computed only over anchors that are BOTH positive AND have valid GT
+    keypoints (kpt_valid==1). Multiplicative masking keeps it CUDA-Graphs
+    capture-safe (no boolean indexing → static shapes). Normalized by the
+    count of valid keypoint coordinates so the magnitude is comparable to the
+    box loss.
+    """
+
+    def __init__(self, beta: float = 0.11):
+        super().__init__()
+        self.beta = beta
+
+    def forward(self, kpt_pred: torch.Tensor, kpt_target: torch.Tensor,
+                pos_mask: torch.Tensor, kpt_valid: torch.Tensor) -> torch.Tensor:
+        # kpt_pred / kpt_target: (B, N, K*2). pos_mask / kpt_valid: (B, N).
+        diff = (kpt_pred - kpt_target).abs()
+        loss_per = torch.where(diff < self.beta,
+                               0.5 * diff ** 2 / self.beta,
+                               diff - 0.5 * self.beta)              # (B, N, K*2)
+        mask = (pos_mask.float() * kpt_valid.float()).unsqueeze(-1)  # (B, N, 1)
+        coords = kpt_pred.shape[-1]
+        # Normalize by number of valid coordinate elements (n_valid_anchors*K*2).
+        n_valid = (pos_mask.float() * kpt_valid.float()).sum().clamp(min=1.0) * float(coords)
+        return (loss_per * mask).sum() / n_valid
+
+
 class DetectorLoss(nn.Module):
-    """Combined focal cls + smooth-L1 box."""
+    """Combined focal cls + smooth-L1 box + optional masked keypoint loss.
+
+    The keypoint term is a no-op (and absent from the returned dict) when
+    ``kpt_pred`` is None — so a detector built with ``n_kpts == 0`` behaves
+    exactly as before.
+    """
 
     def __init__(self, alpha: float = 0.25, gamma: float = 2.0,
-                 box_weight: float = 1.0, beta: float = 0.11):
+                 box_weight: float = 1.0, beta: float = 0.11,
+                 kpt_weight: float = 0.0, kpt_beta: float = 0.11):
         super().__init__()
         self.focal = FocalClassificationLoss(alpha=alpha, gamma=gamma)
         self.box = SmoothL1BoxLoss(beta=beta)
+        self.kpt = KeypointRegressionLoss(beta=kpt_beta)
         self.box_weight = box_weight
+        self.kpt_weight = kpt_weight
 
     def forward(self, cls_logits: torch.Tensor, box_pred: torch.Tensor,
-                cls_target: torch.Tensor, box_target: torch.Tensor) -> dict[str, torch.Tensor]:
+                cls_target: torch.Tensor, box_target: torch.Tensor,
+                kpt_pred: torch.Tensor | None = None,
+                kpt_target: torch.Tensor | None = None,
+                kpt_valid: torch.Tensor | None = None,
+                ) -> dict[str, torch.Tensor]:
         # cls_target: (B, N) with -1/0/1, box_target: (B, N, 4)
+        # kpt_*: (B, N, K*2) / (B, N) when keypoints are enabled.
         pos = cls_target == 1
         cls_loss = self.focal(cls_logits, cls_target)
         box_loss = self.box(box_pred, box_target, pos)
         total = cls_loss + self.box_weight * box_loss
-        return {"loss": total, "cls": cls_loss.detach(), "box": box_loss.detach()}
+        out = {"loss": total, "cls": cls_loss.detach(), "box": box_loss.detach()}
+        if kpt_pred is not None and self.kpt_weight > 0:
+            if kpt_valid is None:
+                kpt_valid = torch.ones(pos.shape, device=pos.device)
+            kpt_loss = self.kpt(kpt_pred, kpt_target, pos, kpt_valid)
+            out["loss"] = total + self.kpt_weight * kpt_loss
+            out["kpt"] = kpt_loss.detach()
+        return out
 
 
 # --------------------------------------------------------------------------

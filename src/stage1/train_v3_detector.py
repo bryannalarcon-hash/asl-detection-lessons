@@ -42,21 +42,33 @@ from src.stage1.data.hagrid import HaGRIDDataset
 from src.stage1.data.synthetic_composite import SyntheticCompositeDataset
 from src.stage1.losses_v3 import DetectorLoss
 from src.stage1.models.anchors import (
-    build_targets_gpu, build_targets_gpu_batched, encode_box, get_anchors,
-    match_anchors_to_gt, xywh_to_xyxy,
+    build_kpt_targets, build_targets_gpu, build_targets_gpu_batched, encode_box,
+    get_anchors, match_anchors_to_gt, xywh_to_xyxy,
 )
 from src.stage1.models.palm_detector import PalmDetector, count_params
 
 
 def _build_targets(boxes_per_image: list[torch.Tensor], anchors_xywh: np.ndarray,
-                   pos_iou: float, neg_iou: float
-                   ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Encode GT bbox lists → (cls_target (B,N), box_target (B,N,4))."""
+                   pos_iou: float, neg_iou: float,
+                   kpts_per_image: list[torch.Tensor] | None = None,
+                   kpts_valid_per_image: list[torch.Tensor] | None = None,
+                   n_kpts: int = 0,
+                   ) -> tuple[torch.Tensor, torch.Tensor,
+                              torch.Tensor | None, torch.Tensor | None]:
+    """Encode GT bbox lists → (cls_target (B,N), box_target (B,N,4)).
+
+    When ``n_kpts > 0`` (and per-image keypoints are supplied), also returns
+    ``kpt_target (B, N, n_kpts*2)`` and ``kpt_valid (B, N)``; otherwise those
+    two are None.
+    """
     anchors_xyxy = xywh_to_xyxy(anchors_xywh)
     N = anchors_xywh.shape[0]
     batch = len(boxes_per_image)
     cls = np.zeros((batch, N), dtype=np.int64)
     boxr = np.zeros((batch, N, 4), dtype=np.float32)
+    want_kpts = n_kpts > 0 and kpts_per_image is not None
+    kpt_t = np.zeros((batch, N, n_kpts * 2), dtype=np.float32) if want_kpts else None
+    kpt_v = np.zeros((batch, N), dtype=np.float32) if want_kpts else None
     for b, boxes in enumerate(boxes_per_image):
         if boxes.shape[0] == 0:
             cls[b] = 0  # all negative
@@ -72,8 +84,17 @@ def _build_targets(boxes_per_image: list[torch.Tensor], anchors_xywh: np.ndarray
         if pos_idx.size > 0:
             gt_for_pos = gt_xywh[assignment[pos_idx]]
             boxr[b, pos_idx] = encode_box(gt_for_pos, anchors_xywh[pos_idx])
+        if want_kpts:
+            gt_kpts = kpts_per_image[b].cpu().numpy().reshape(-1, n_kpts, 2)
+            gt_valid = kpts_valid_per_image[b].cpu().numpy().reshape(-1)
+            kt, kv = build_kpt_targets(assignment, anchors_xywh, gt_kpts,
+                                       gt_valid, n_kpts)
+            kpt_t[b] = kt
+            kpt_v[b] = kv
         cls[b] = cls_row
-    return torch.from_numpy(cls), torch.from_numpy(boxr)
+    kpt_t_out = torch.from_numpy(kpt_t) if want_kpts else None
+    kpt_v_out = torch.from_numpy(kpt_v) if want_kpts else None
+    return torch.from_numpy(cls), torch.from_numpy(boxr), kpt_t_out, kpt_v_out
 
 
 def main() -> None:
@@ -283,9 +304,11 @@ def main() -> None:
     # Model + loss ------------------------------------------------------
     # Multi-stride FPN config is opt-in: missing fields keep the legacy
     # single-list-of-scales SSDLite arch byte-compatible with old checkpoints.
+    n_kpts = int(deep_get(cfg, "model.n_kpts", 0) or 0)
     model_kwargs = dict(
         n_anchors_per_cell=deep_get(cfg, "model.n_anchors_per_cell", 3),
         n_aux_kpts=deep_get(cfg, "model.n_aux_kpts", 0),
+        n_kpts=n_kpts,
     )
     if deep_get(cfg, "model.use_fpn") is not None:
         model_kwargs["use_fpn"] = bool(deep_get(cfg, "model.use_fpn"))
@@ -295,6 +318,18 @@ def main() -> None:
     if aps is not None:
         model_kwargs["anchors_per_scale"] = tuple(int(x) for x in aps)
     model = PalmDetector(**model_kwargs).to(device)
+    if n_kpts > 0:
+        # Keypoint targets are only produced by the numpy _build_targets path.
+        # The numba / GPU-batched / DALI matchers emit (cls, box) only.
+        if args.use_numba_anchors or use_gpu_anchor_matcher or use_dali_box_encoder:
+            raise SystemExit(
+                "[err] model.n_kpts>0 requires the numpy anchor matcher; "
+                "disable --use-numba-anchors / --use-gpu-anchor-matcher / "
+                "--use-dali-box-encoder (they do not emit keypoint targets).")
+        if use_dali:
+            raise SystemExit(
+                "[err] model.n_kpts>0 is not supported with --use-dali; the "
+                "DALI pipeline does not carry per-box keypoints.")
     use_channels_last = args.channels_last and device == "cuda"
     if use_channels_last:
         model = model.to(memory_format=torch.channels_last)
@@ -306,6 +341,8 @@ def main() -> None:
         gamma=deep_get(cfg, "loss.focal_gamma", 2.0),
         box_weight=deep_get(cfg, "loss.box_weight", 1.0),
         beta=deep_get(cfg, "loss.smoothl1_beta", 0.11),
+        kpt_weight=deep_get(cfg, "loss.kpt_weight", 0.0) if n_kpts > 0 else 0.0,
+        kpt_beta=deep_get(cfg, "loss.kpt_beta", 0.11),
     )
     optimizer = AdamW(model.parameters(), lr=deep_get(cfg, "train.lr"),
                       weight_decay=deep_get(cfg, "train.weight_decay"),
@@ -346,11 +383,13 @@ def main() -> None:
     # otherwise legacy uniform-scale anchors at input_size.
     scales_per_stride = deep_get(cfg, "anchors.scales_per_stride")
     strides_cfg = deep_get(cfg, "anchors.strides")
+    square_anchors = bool(deep_get(cfg, "anchors.square", False))
     if scales_per_stride is not None and strides_cfg is not None:
         anchors_xywh = get_anchors(
             deep_get(cfg, "data.input_size"),
             scales_per_stride=scales_per_stride,
             strides=strides_cfg,
+            square=square_anchors,
         )
     else:
         anchors_xywh = get_anchors(deep_get(cfg, "data.input_size"))
@@ -398,6 +437,8 @@ def main() -> None:
 
         model.train()
         running = {"loss": 0.0, "cls": 0.0, "box": 0.0}
+        if n_kpts > 0:
+            running["kpt"] = 0.0
         n_steps = 0
         # Unified per-epoch iterator: DALI yields indefinitely → cap at steps_per_epoch.
         if use_dali:
@@ -433,18 +474,31 @@ def main() -> None:
             else:
                 # Numpy matcher is fastest at our batch sizes; a torchified
                 # variant regressed (see --use-gpu-anchor-matcher).
-                cls_t, box_t = _build_targets(batch["boxes"], anchors_xywh, pos_iou, neg_iou)
+                cls_t, box_t, kpt_t, kpt_v = _build_targets(
+                    batch["boxes"], anchors_xywh, pos_iou, neg_iou,
+                    kpts_per_image=batch.get("kpts") if n_kpts > 0 else None,
+                    kpts_valid_per_image=batch.get("kpts_valid") if n_kpts > 0 else None,
+                    n_kpts=n_kpts)
                 cls_t = cls_t.to(device, non_blocking=True)
                 box_t = box_t.to(device, non_blocking=True)
+                if kpt_t is not None:
+                    kpt_t = kpt_t.to(device, non_blocking=True)
+                    kpt_v = kpt_v.to(device, non_blocking=True)
+
+            def _compute_loss():
+                out = model(image)
+                if n_kpts > 0 and "kpt" in out:
+                    return out, loss_fn(out["cls"], out["box"], cls_t, box_t,
+                                        kpt_pred=out["kpt"], kpt_target=kpt_t,
+                                        kpt_valid=kpt_v)
+                return out, loss_fn(out["cls"], out["box"], cls_t, box_t)
 
             if use_cuda_graphs:
                 if use_amp_bf16:
                     with torch.amp.autocast(device_type="cuda", dtype=torch.bfloat16):
-                        out = model(image)
-                        losses = loss_fn(out["cls"], out["box"], cls_t, box_t)
+                        out, losses = _compute_loss()
                 else:
-                    out = model(image)
-                    losses = loss_fn(out["cls"], out["box"], cls_t, box_t)
+                    out, losses = _compute_loss()
                 losses["loss"].backward()
                 torch.nn.utils.clip_grad_norm_(
                     model.parameters(), deep_get(cfg, "train.grad_clip", 1.0))
@@ -455,11 +509,9 @@ def main() -> None:
                 optimizer.zero_grad(set_to_none=True)
                 if use_amp_bf16:
                     with torch.amp.autocast(device_type="cuda", dtype=torch.bfloat16):
-                        out = model(image)
-                        losses = loss_fn(out["cls"], out["box"], cls_t, box_t)
+                        out, losses = _compute_loss()
                 else:
-                    out = model(image)
-                    losses = loss_fn(out["cls"], out["box"], cls_t, box_t)
+                    out, losses = _compute_loss()
                 losses["loss"].backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(),
                                                deep_get(cfg, "train.grad_clip", 1.0))
@@ -482,17 +534,25 @@ def main() -> None:
             "box_loss": running["box"] / max(n_steps, 1),
             "lr": optimizer.param_groups[0]["lr"],
         }
+        if n_kpts > 0:
+            line["kpt_loss"] = running["kpt"] / max(n_steps, 1)
         with metrics_log.open("a") as f:
             f.write(json.dumps(line) + "\n")
+        kpt_str = (f"  kpt={line['kpt_loss']:.5f}" if n_kpts > 0 else "")
         print(f"[epoch {epoch:03d}] took={epoch_secs:.1f}s  loss={avg_loss:.5f}  "
-              f"cls={line['cls_loss']:.5f}  box={line['box_loss']:.5f}  lr={line['lr']:.6f}",
+              f"cls={line['cls_loss']:.5f}  box={line['box_loss']:.5f}{kpt_str}  "
+              f"lr={line['lr']:.6f}",
               flush=True)
 
         if avg_loss < best_loss - deep_get(cfg, "train.early_stop_min_delta", 0.001):
             best_loss = avg_loss
             patience = 0
-            torch.save({"model": ema.module.state_dict(), "epoch": epoch,
-                        "metrics": line, "config": cfg}, ckpt_dir / "best.pt")
+            best_ckpt = {"model": ema.module.state_dict(), "epoch": epoch,
+                         "metrics": line, "config": cfg}
+            torch.save(best_ckpt, ckpt_dir / "best.pt")
+            # Lean export mirror: same dict (already optimizer-free) under a
+            # stable name for the Net 3 / inference handoff.
+            torch.save(best_ckpt, ckpt_dir / "best_export.pt")
         else:
             patience += 1
             if patience >= deep_get(cfg, "train.early_stop_patience", 20):

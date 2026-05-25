@@ -66,6 +66,7 @@ def multi_stride_anchors(
     input_size: int = MULTI_STRIDE_INPUT_SIZE,
     scales_per_stride: Sequence[Sequence[float]] = MULTI_STRIDE_SCALES,
     strides: Sequence[int] = MULTI_STRIDE_STRIDES,
+    square: bool = False,
 ) -> np.ndarray:
     """Build anchors with a separate scale list at each stride.
 
@@ -75,9 +76,14 @@ def multi_stride_anchors(
         scales_per_stride: outer sequence of length ``len(strides)``. Each
             inner sequence holds the per-cell anchor scales (relative to
             ``input_size``) for that stride. Empty inner sequences are
-            rejected.
+            rejected. Each scale may be a scalar (square anchor) or a
+            ``(w_frac, h_frac)`` pair (rectangular anchor).
         strides: feature-map strides. Smaller strides come first so the
             anchor order matches the head concat order (P1 -> P2 -> P3).
+        square: force every anchor to be square (w == h). Palms are roughly
+            square, so this keeps the box-regression target tight. For scalar
+            scales this is a no-op (they are already square); for pair scales
+            the longer side is used for both w and h.
 
     Returns:
         (N, 4) float32 numpy array of anchors in image-pixel (cx, cy, w, h)
@@ -105,9 +111,20 @@ def multi_stride_anchors(
                 cx = (gx + 0.5) * cell
                 cy = (gy + 0.5) * cell
                 for s in scales:
-                    side = float(s) * input_size
-                    anchors.append((cx, cy, side, side))
+                    w_frac, h_frac = _scale_to_wh(s)
+                    w = w_frac * input_size
+                    h = h_frac * input_size
+                    if square:
+                        w = h = max(w, h)
+                    anchors.append((cx, cy, w, h))
     return np.asarray(anchors, dtype=np.float32)
+
+
+def _scale_to_wh(s) -> tuple[float, float]:
+    """Normalize a scale entry to a (w_frac, h_frac) pair."""
+    if isinstance(s, (tuple, list, np.ndarray)):
+        return float(s[0]), float(s[1])
+    return float(s), float(s)
 
 
 _ANCHORS_CACHE: dict[tuple, np.ndarray] = {}
@@ -115,14 +132,16 @@ _ANCHORS_CACHE: dict[tuple, np.ndarray] = {}
 
 def get_anchors(input_size: int = INPUT_SIZE,
                 scales_per_stride: Sequence[Sequence[float]] | None = None,
-                strides: Sequence[int] | None = None) -> np.ndarray:
+                strides: Sequence[int] | None = None,
+                square: bool = False) -> np.ndarray:
     """Return cached anchors for the given layout.
 
     With no override args, returns the legacy uniform-scale anchors at
     ``input_size`` (back-compat for existing callers). If either
     ``scales_per_stride`` or ``strides`` is provided, both must be given
-    and the multi-stride generator is used instead. The cache key
-    discriminates the two layouts so they cannot collide.
+    and the multi-stride generator is used instead. ``square`` forces w==h
+    on the multi-stride anchors. The cache key discriminates the layouts so
+    they cannot collide.
     """
     if scales_per_stride is None and strides is None:
         key = ("legacy", int(input_size))
@@ -136,14 +155,16 @@ def get_anchors(input_size: int = INPUT_SIZE,
     key = (
         "multi",
         int(input_size),
-        tuple(tuple(float(s) for s in lst) for lst in scales_per_stride),
+        tuple(tuple(_scale_to_wh(s) for s in lst) for lst in scales_per_stride),
         tuple(int(s) for s in strides),
+        bool(square),
     )
     if key not in _ANCHORS_CACHE:
         _ANCHORS_CACHE[key] = multi_stride_anchors(
             input_size=input_size,
             scales_per_stride=scales_per_stride,
             strides=strides,
+            square=square,
         )
     return _ANCHORS_CACHE[key]
 
@@ -183,6 +204,94 @@ def decode_box(deltas: torch.Tensor, anchors_xywh: torch.Tensor) -> torch.Tensor
     w = torch.exp(deltas[..., 2]) * anchors_xywh[..., 2]
     h = torch.exp(deltas[..., 3]) * anchors_xywh[..., 3]
     return torch.stack([cx, cy, w, h], dim=-1)
+
+
+def encode_kpts(kpts: np.ndarray, anchors_xywh: np.ndarray) -> np.ndarray:
+    """Encode keypoints as offsets from the anchor center / anchor size.
+
+    Same convention as ``encode_box``'s (dx, dy) center deltas, applied per
+    keypoint:  dx_k = (kx - acx) / aw,  dy_k = (ky - acy) / ah.
+
+    Args:
+        kpts: (N, K, 2) GT keypoints in image-pixel coords.
+        anchors_xywh: (N, 4) anchors in (cx, cy, w, h) coords (one per kpt set).
+
+    Returns:
+        (N, K, 2) normalized offsets.
+    """
+    acx = anchors_xywh[..., None, 0]
+    acy = anchors_xywh[..., None, 1]
+    aw = anchors_xywh[..., None, 2]
+    ah = anchors_xywh[..., None, 3]
+    dx = (kpts[..., 0] - acx) / aw
+    dy = (kpts[..., 1] - acy) / ah
+    return np.stack([dx, dy], axis=-1).astype(np.float32)
+
+
+def decode_kpts(offsets: torch.Tensor, anchors_xywh: torch.Tensor) -> torch.Tensor:
+    """Inverse of ``encode_kpts`` (torch, for inference).
+
+    Args:
+        offsets: (..., K, 2) predicted normalized offsets, OR (..., K*2)
+            flat — the flat form (matching the model's "kpt" output channel
+            layout [k0_x, k0_y, k1_x, k1_y, ...]) is reshaped automatically.
+        anchors_xywh: (..., 4) anchors in (cx, cy, w, h) coords, broadcastable
+            to the keypoint sets.
+
+    Returns:
+        (..., K, 2) keypoints in image-pixel (input) coords.
+    """
+    if offsets.shape[-1] != 2:
+        offsets = offsets.reshape(*offsets.shape[:-1], -1, 2)
+    acx = anchors_xywh[..., None, 0]
+    acy = anchors_xywh[..., None, 1]
+    aw = anchors_xywh[..., None, 2]
+    ah = anchors_xywh[..., None, 3]
+    kx = offsets[..., 0] * aw + acx
+    ky = offsets[..., 1] * ah + acy
+    return torch.stack([kx, ky], dim=-1)
+
+
+def build_kpt_targets(assignment: np.ndarray, anchors_xywh: np.ndarray,
+                      gt_kpts: np.ndarray, gt_kpts_valid: np.ndarray,
+                      n_kpts: int) -> tuple[np.ndarray, np.ndarray]:
+    """Per-anchor encoded keypoint targets + a per-anchor kpt-valid mask.
+
+    Sibling of ``match_anchors_to_gt``: given that function's per-anchor
+    ``assignment`` (>=0 = matched GT index), encode each positive anchor's
+    matched-GT keypoints into anchor-relative offsets and propagate the GT's
+    kpt-valid flag onto the anchor. Negative/ignore anchors and anchors whose
+    matched GT had ``kpts_valid==0`` get zero target + valid 0.
+
+    Args:
+        assignment: (N,) int from ``match_anchors_to_gt`` (-1 neg / -2 ignore
+            / >=0 GT index).
+        anchors_xywh: (N, 4) anchors in (cx, cy, w, h).
+        gt_kpts: (M, K, 2) GT keypoints in image-pixel coords (K == n_kpts).
+        gt_kpts_valid: (M,) 0/1 per-GT kpt-valid flag.
+        n_kpts: keypoints per box (K).
+
+    Returns:
+        kpt_target: (N, K*2) encoded offsets (flat, [k0_x, k0_y, k1_x, ...]),
+            zero where not a valid positive.
+        kpt_valid:  (N,) float32, 1 where the anchor is positive AND its
+            matched GT had valid keypoints, else 0.
+    """
+    N = anchors_xywh.shape[0]
+    kpt_target = np.zeros((N, n_kpts * 2), dtype=np.float32)
+    kpt_valid = np.zeros((N,), dtype=np.float32)
+    pos_idx = np.where(assignment >= 0)[0]
+    if pos_idx.size == 0 or gt_kpts.shape[0] == 0:
+        return kpt_target, kpt_valid
+    matched_gt = assignment[pos_idx]
+    valid_pos = gt_kpts_valid[matched_gt] > 0
+    use_idx = pos_idx[valid_pos]
+    if use_idx.size == 0:
+        return kpt_target, kpt_valid
+    enc = encode_kpts(gt_kpts[assignment[use_idx]], anchors_xywh[use_idx])
+    kpt_target[use_idx] = enc.reshape(use_idx.size, n_kpts * 2)
+    kpt_valid[use_idx] = 1.0
+    return kpt_target, kpt_valid
 
 
 def match_anchors_to_gt(anchors_xyxy: np.ndarray, gt_xyxy: np.ndarray,

@@ -3,6 +3,9 @@
 Combines COCO-WholeBody + FreiHAND + HaGRID. Each sample emits:
   - 192x192 letterboxed uint8 image tensor (normalized to [-1, 1])
   - GT palm bboxes in letterboxed-input coords
+  - per-box keypoints (wrist, middle-MCP) in the same letterboxed-input
+    coords plus a per-box valid flag (1 where the source supplied hand
+    keypoints, 0 otherwise)
 
 If a decoded image cache exists at `cache_root/{source_tag}/{images.bin,index.json}`,
 the worker reads pre-decoded letterboxed arrays from a memory-mapped file
@@ -20,6 +23,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
+from src.stage1.data import schema as S
 from src.stage1.data.coco_wholebody import CocoWholeBodyDataset
 from src.stage1.data.egohands import EgoHandsDataset, egohands_bboxes_to_pixel
 from src.stage1.data.freihand import FreiHANDDataset
@@ -32,18 +36,59 @@ from src.stage1.data.synthetic_composite import (
 )
 
 
+# Wrist + middle-MCP indices within one 21-pt hand (standard hand ordering).
+_KPT_LOCAL = (0, 9)  # [wrist, middle_MCP]
+# Per-hand starts in the unified 49-kpt schema (see schema.py).
+_HAND_STARTS = {"right": S.RIGHT_HAND_START, "left": S.LEFT_HAND_START}
+
+
+def _letterbox_params(img_w: int, img_h: int,
+                      input_size: int) -> tuple[float, float, float]:
+    """Return (scale, dx, dy) for the letterbox transform used everywhere."""
+    scale = input_size / max(img_w, img_h)
+    dx = (input_size - img_w * scale) / 2
+    dy = (input_size - img_h * scale) / 2
+    return scale, dx, dy
+
+
 def _normalize_bbox_to_input(box: HandBBox, img_w: int, img_h: int,
                              input_size: int) -> HandBBox:
     """Scale a box from source image dims to network input dims (letterboxed)."""
-    scale = input_size / max(img_w, img_h)
-    new_w = img_w * scale
-    new_h = img_h * scale
-    dx = (input_size - new_w) / 2
-    dy = (input_size - new_h) / 2
+    scale, dx, dy = _letterbox_params(img_w, img_h, input_size)
     return HandBBox(
         x=box.x * scale + dx, y=box.y * scale + dy,
         w=box.w * scale, h=box.h * scale, side=box.side,
     )
+
+
+def _normalize_point_to_input(pt: np.ndarray, scale: float, dx: float,
+                              dy: float) -> np.ndarray:
+    """Apply the same letterbox transform to a (..., 2) point array."""
+    out = pt.astype(np.float32) * scale
+    out[..., 0] += dx
+    out[..., 1] += dy
+    return out
+
+
+def _box_kpts_from_sample(sample: dict, box: HandBBox, scale: float,
+                          dx: float, dy: float) -> tuple[np.ndarray, int]:
+    """Extract the (wrist, middle-MCP) keypoints for one palm box.
+
+    Returns ((2, 2) float32 in letterboxed-input coords, valid flag). For
+    sources that carry a 49-kpt `keypoints`/`visible` array (COCO, FreiHAND),
+    the points come from the box's hand slot. For box-only sources the caller
+    never reaches here (handled with zeros + valid=0 upstream).
+    """
+    kpts = sample.get("keypoints")
+    visible = sample.get("visible")
+    start = _HAND_STARTS.get(box.side)
+    if kpts is None or visible is None or start is None:
+        return np.zeros((2, 2), dtype=np.float32), 0
+    idx = [start + i for i in _KPT_LOCAL]
+    if any(int(visible[i]) == 0 for i in idx):
+        return np.zeros((2, 2), dtype=np.float32), 0
+    pts = np.asarray(kpts, dtype=np.float32)[idx]  # (2, 2) source-pixel coords
+    return _normalize_point_to_input(pts, scale, dx, dy), 1
 
 
 def _source_tag_for(ds: Dataset) -> str:
@@ -190,7 +235,10 @@ class DetectorTrainDataset(Dataset):
             dx = (self.input_size - new_w) // 2
             canvas[dy:dy + new_h, dx:dx + new_w] = resized
 
-        # Derive GT bboxes per source type (in source-pixel coords).
+        # Derive GT bboxes per source type (in source-pixel coords). Only
+        # keypoint sources (COCO, FreiHAND) carry a 49-kpt array we can read
+        # wrist + middle-MCP from; box-only sources emit zeros + valid=0.
+        has_hand_kpts = False
         if isinstance(source, HaGRIDDataset):
             boxes = hagrid_bboxes_to_pixel(sample["norm_bboxes"], img_w, img_h,
                                            leading_hand=sample.get("leading_hand", "right"))
@@ -205,7 +253,9 @@ class DetectorTrainDataset(Dataset):
         else:
             boxes = palm_bbox_for_each_hand(sample["keypoints"], sample["visible"],
                                             pad=self.padding_frac)
+            has_hand_kpts = True
 
+        scale, dx, dy = _letterbox_params(img_w, img_h, self.input_size)
         boxes_in_input = [
             _normalize_bbox_to_input(b, img_w, img_h, self.input_size) for b in boxes
         ]
@@ -213,13 +263,23 @@ class DetectorTrainDataset(Dataset):
         img_tensor = torch.from_numpy(canvas.copy()).permute(2, 0, 1).float() / 255.0
         img_tensor = (img_tensor - 0.5) / 0.5
 
-        boxes_arr = np.zeros((len(boxes_in_input), 4), dtype=np.float32)
-        for i, b in enumerate(boxes_in_input):
-            boxes_arr[i] = [b.x + b.w / 2, b.y + b.h / 2, b.w, b.h]
+        M = len(boxes_in_input)
+        boxes_arr = np.zeros((M, 4), dtype=np.float32)
+        kpts_arr = np.zeros((M, 2, 2), dtype=np.float32)
+        kpts_valid = np.zeros((M,), dtype=np.float32)
+        for i, (b_src, b_in) in enumerate(zip(boxes, boxes_in_input)):
+            boxes_arr[i] = [b_in.x + b_in.w / 2, b_in.y + b_in.h / 2,
+                            b_in.w, b_in.h]
+            if has_hand_kpts:
+                pts, valid = _box_kpts_from_sample(sample, b_src, scale, dx, dy)
+                kpts_arr[i] = pts
+                kpts_valid[i] = valid
 
         return {
             "image": img_tensor,
             "boxes": torch.from_numpy(boxes_arr),
+            "kpts": torch.from_numpy(kpts_arr),
+            "kpts_valid": torch.from_numpy(kpts_valid),
             "image_id": sample.get("image_id", idx),
         }
 
@@ -227,15 +287,24 @@ class DetectorTrainDataset(Dataset):
         return {
             "image": torch.zeros(3, self.input_size, self.input_size),
             "boxes": torch.zeros(0, 4),
+            "kpts": torch.zeros(0, 2, 2),
+            "kpts_valid": torch.zeros(0),
             "image_id": idx,
         }
 
 
 def detector_collate(batch: list[dict]) -> dict:
-    """Variable bbox count per sample → list, not stacked."""
+    """Variable bbox count per sample → list, not stacked.
+
+    `kpts` ((M, 2, 2) per sample) and `kpts_valid` ((M,)) are carried as
+    parallel lists alongside `boxes`, so the i-th element of each list
+    describes the same sample's GT boxes.
+    """
     return {
         "image": torch.stack([b["image"] for b in batch]),
         "boxes": [b["boxes"] for b in batch],
+        "kpts": [b["kpts"] for b in batch],
+        "kpts_valid": [b["kpts_valid"] for b in batch],
         "image_id": [b["image_id"] for b in batch],
     }
 
