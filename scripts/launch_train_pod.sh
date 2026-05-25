@@ -85,11 +85,14 @@ ENVF="/tmp/remote_env_${ROLE}_$$"
 } > "$ENVF"
 "${SCP[@]}" "$ENVF" "root@$HOST:/workspace/asl/.remote_env"
 rm -f "$ENVF"
-"${SSH[@]}" "chmod +x /workspace/asl/scripts/_remote_train.sh && \
-    setsid tmux new-session -d -s train_$ROLE \
-    'bash /workspace/asl/scripts/_remote_train.sh $ROLE 2>&1 | tee -a /workspace/asl/logs/remote_$ROLE.log'"
-"${SSH[@]}" "tmux has-session -t train_$ROLE" \
-    || { echo "[FATAL] tmux session did not start"; exit 7; }
+# Detach with nohup+setsid (the runpod image has no tmux). The process keeps
+# running after this SSH connection closes; logs land in logs/remote_<role>.log.
+"${SSH[@]}" "cd /workspace/asl && chmod +x scripts/_remote_train.sh && \
+    setsid bash scripts/_remote_train.sh $ROLE >logs/remote_$ROLE.log 2>&1 </dev/null & \
+    disown; echo launched"
+sleep 3
+"${SSH[@]}" "pgrep -f 'scripts/_remote_train.sh $ROLE' >/dev/null" \
+    || { echo "[FATAL] remote training process did not start"; exit 7; }
 
 echo "[6/6] recording pod to .round_env"
 # .round_env line: POD <role> <pod_id> <host> <port> <remote_ckpt_dir>
