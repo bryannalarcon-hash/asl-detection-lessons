@@ -43,7 +43,7 @@ export const DEV_PASSWORD = 'asl-dev-password';
 export const DEV_DISPLAY_NAME = 'Dev User';
 export const DEV_CREATED_DAYS_AGO = 75;
 export const HEATMAP_DAYS = 75;
-export const TOTAL_SIGNS = 75;
+export const TOTAL_SIGNS = 96;
 
 // Per PRD §"Seed data shape"
 export const MASTERY_BUCKETS: Record<MasteryLevel, number> = {
@@ -77,145 +77,35 @@ interface LessonSeed {
   signs: { gloss: string }[];
 }
 
-/** 12 lessons × 6-7 signs = 75 signs total (12·6 + 3 = 75; first 3 lessons get 7). */
+/**
+ * The pilot curriculum IS the Net 4 training vocabulary: the 96 PopSign words
+ * (configs/popsign_vocab.json) the classifier is trained on. Glosses are the
+ * uppercased clip tokens so `slugify(gloss)` matches the reference clip
+ * filename in public/videos/lessons/<slug>.mp4 — every lesson sign has a real
+ * demonstration video AND is a class the model can recognize. 12 lessons,
+ * 96 signs total.
+ */
 export const LESSON_CATALOG: LessonSeed[] = [
   {
-    title: 'Lesson 1: Greetings',
-    category: 'Greetings',
-    signCount: 7,
+    title: 'Lesson 1: People',
+    category: 'People',
+    signCount: 9,
     signs: [
-      { gloss: 'HELLO' },
-      { gloss: 'GOODBYE' },
-      { gloss: 'NICE_TO_MEET_YOU' },
-      { gloss: 'THANK_YOU' },
-      { gloss: 'YOU_WELCOME' },
-      { gloss: 'PLEASE' },
-      { gloss: 'SORRY' },
-    ],
-  },
-  {
-    title: 'Lesson 2: Numbers',
-    category: 'Numbers',
-    signCount: 7,
-    signs: [
-      { gloss: 'ONE' },
-      { gloss: 'TWO' },
-      { gloss: 'THREE' },
-      { gloss: 'FOUR' },
-      { gloss: 'FIVE' },
-      { gloss: 'TEN' },
-      { gloss: 'TWENTY' },
-    ],
-  },
-  {
-    title: 'Lesson 3: Family',
-    category: 'Family',
-    signCount: 7,
-    signs: [
-      { gloss: 'MOTHER' },
-      { gloss: 'FATHER' },
-      { gloss: 'SISTER' },
+      { gloss: 'MOM' },
+      { gloss: 'DAD' },
       { gloss: 'BROTHER' },
-      { gloss: 'BABY' },
-      { gloss: 'FAMILY' },
-      { gloss: 'FRIEND' },
+      { gloss: 'GRANDMA' },
+      { gloss: 'GRANDPA' },
+      { gloss: 'AUNT' },
+      { gloss: 'UNCLE' },
+      { gloss: 'BOY' },
+      { gloss: 'GIRL' },
     ],
   },
   {
-    title: 'Lesson 4: Feelings',
-    category: 'Feelings',
-    signCount: 6,
-    signs: [
-      { gloss: 'HAPPY' },
-      { gloss: 'SAD' },
-      { gloss: 'ANGRY' },
-      { gloss: 'TIRED' },
-      { gloss: 'EXCITED' },
-      { gloss: 'NERVOUS' },
-    ],
-  },
-  {
-    title: 'Lesson 5: Food',
-    category: 'Food',
-    signCount: 6,
-    signs: [
-      { gloss: 'EAT' },
-      { gloss: 'DRINK' },
-      { gloss: 'WATER' },
-      { gloss: 'BREAD' },
-      { gloss: 'APPLE' },
-      { gloss: 'COFFEE' },
-    ],
-  },
-  {
-    title: 'Lesson 6: Time',
-    category: 'Time',
-    signCount: 6,
-    signs: [
-      { gloss: 'TODAY' },
-      { gloss: 'TOMORROW' },
-      { gloss: 'YESTERDAY' },
-      { gloss: 'NOW' },
-      { gloss: 'MORNING' },
-      { gloss: 'NIGHT' },
-    ],
-  },
-  {
-    title: 'Lesson 7: Places',
-    category: 'Places',
-    signCount: 6,
-    signs: [
-      { gloss: 'HOME' },
-      { gloss: 'SCHOOL' },
-      { gloss: 'WORK' },
-      { gloss: 'STORE' },
-      { gloss: 'CITY' },
-      { gloss: 'PARK' },
-    ],
-  },
-  {
-    title: 'Lesson 8: Verbs',
-    category: 'Verbs',
-    signCount: 6,
-    signs: [
-      { gloss: 'GO' },
-      { gloss: 'COME' },
-      { gloss: 'WANT' },
-      { gloss: 'NEED' },
-      { gloss: 'LIKE' },
-      { gloss: 'HAVE' },
-    ],
-  },
-  {
-    title: 'Lesson 9: Question Words',
-    category: 'Question Words',
-    signCount: 6,
-    signs: [
-      { gloss: 'WHO' },
-      { gloss: 'WHAT' },
-      { gloss: 'WHERE' },
-      { gloss: 'WHEN' },
-      { gloss: 'WHY' },
-      { gloss: 'HOW' },
-    ],
-  },
-  {
-    title: 'Lesson 10: Colors',
-    category: 'Colors',
-    signCount: 6,
-    signs: [
-      { gloss: 'RED' },
-      { gloss: 'BLUE' },
-      { gloss: 'GREEN' },
-      { gloss: 'YELLOW' },
-      { gloss: 'BLACK' },
-      { gloss: 'WHITE' },
-    ],
-  },
-  {
-    title: 'Lesson 11: Animals',
+    title: 'Lesson 2: Animals — Pets & Farm',
     category: 'Animals',
-    signCount: 6,
+    signCount: 7,
     signs: [
       { gloss: 'DOG' },
       { gloss: 'CAT' },
@@ -223,19 +113,157 @@ export const LESSON_CATALOG: LessonSeed[] = [
       { gloss: 'FISH' },
       { gloss: 'HORSE' },
       { gloss: 'COW' },
+      { gloss: 'PIG' },
     ],
   },
   {
-    title: 'Lesson 12: Everyday Phrases',
-    category: 'Phrases',
-    signCount: 6,
+    title: 'Lesson 3: Animals — Wild',
+    category: 'Animals',
+    signCount: 7,
     signs: [
+      { gloss: 'DUCK' },
+      { gloss: 'FROG' },
+      { gloss: 'LION' },
+      { gloss: 'ELEPHANT' },
+      { gloss: 'OWL' },
+      { gloss: 'BEE' },
+      { gloss: 'MOUSE' },
+    ],
+  },
+  {
+    title: 'Lesson 4: Colors',
+    category: 'Colors',
+    signCount: 8,
+    signs: [
+      { gloss: 'RED' },
+      { gloss: 'BLUE' },
+      { gloss: 'GREEN' },
+      { gloss: 'YELLOW' },
+      { gloss: 'BLACK' },
+      { gloss: 'WHITE' },
+      { gloss: 'BROWN' },
+      { gloss: 'ORANGE' },
+    ],
+  },
+  {
+    title: 'Lesson 5: Food & Drink',
+    category: 'Food',
+    signCount: 9,
+    signs: [
+      { gloss: 'APPLE' },
+      { gloss: 'MILK' },
+      { gloss: 'WATER' },
+      { gloss: 'CARROT' },
+      { gloss: 'CHOCOLATE' },
+      { gloss: 'PIZZA' },
+      { gloss: 'ICECREAM' },
+      { gloss: 'DRINK' },
+      { gloss: 'FOOD' },
+    ],
+  },
+  {
+    title: 'Lesson 6: Action Words I',
+    category: 'Verbs',
+    signCount: 8,
+    signs: [
+      { gloss: 'GO' },
+      { gloss: 'GIVE' },
+      { gloss: 'LOOK' },
+      { gloss: 'SEE' },
+      { gloss: 'READ' },
+      { gloss: 'LIKE' },
+      { gloss: 'HAVE' },
+      { gloss: 'MAKE' },
+    ],
+  },
+  {
+    title: 'Lesson 7: Action Words II',
+    category: 'Verbs',
+    signCount: 7,
+    signs: [
+      { gloss: 'JUMP' },
+      { gloss: 'DANCE' },
+      { gloss: 'RIDE' },
+      { gloss: 'SLEEP' },
+      { gloss: 'TALK' },
+      { gloss: 'HEAR' },
+      { gloss: 'FIND' },
+    ],
+  },
+  {
+    title: 'Lesson 8: Feelings',
+    category: 'Feelings',
+    signCount: 11,
+    signs: [
+      { gloss: 'HAPPY' },
+      { gloss: 'SAD' },
+      { gloss: 'MAD' },
+      { gloss: 'SICK' },
+      { gloss: 'SLEEPY' },
+      { gloss: 'THIRSTY' },
+      { gloss: 'PRETTY' },
+      { gloss: 'CUTE' },
+      { gloss: 'HOT' },
+      { gloss: 'DIRTY' },
+      { gloss: 'FINE' },
+    ],
+  },
+  {
+    title: 'Lesson 9: Time',
+    category: 'Time',
+    signCount: 5,
+    signs: [
+      { gloss: 'NOW' },
+      { gloss: 'MORNING' },
+      { gloss: 'NIGHT' },
+      { gloss: 'TOMORROW' },
+      { gloss: 'YESTERDAY' },
+    ],
+  },
+  {
+    title: 'Lesson 10: Places',
+    category: 'Places',
+    signCount: 5,
+    signs: [
+      { gloss: 'HOME' },
+      { gloss: 'STORE' },
+      { gloss: 'BEDROOM' },
+      { gloss: 'BATHROOM' },
+      { gloss: 'OUTSIDE' },
+    ],
+  },
+  {
+    title: 'Lesson 11: Around the House',
+    category: 'Household',
+    signCount: 9,
+    signs: [
+      { gloss: 'BED' },
+      { gloss: 'CHAIR' },
+      { gloss: 'TABLE' },
+      { gloss: 'BOOK' },
+      { gloss: 'PEN' },
+      { gloss: 'SHIRT' },
+      { gloss: 'SHOE' },
+      { gloss: 'HAT' },
+      { gloss: 'TOY' },
+    ],
+  },
+  {
+    title: 'Lesson 12: Body & Everyday',
+    category: 'Body & Social',
+    signCount: 11,
+    signs: [
+      { gloss: 'EYE' },
+      { gloss: 'EAR' },
+      { gloss: 'NOSE' },
+      { gloss: 'MOUTH' },
+      { gloss: 'HEAD' },
+      { gloss: 'HAIR' },
       { gloss: 'YES' },
       { gloss: 'NO' },
-      { gloss: 'MAYBE' },
-      { gloss: 'HELP' },
-      { gloss: 'UNDERSTAND' },
-      { gloss: 'REPEAT' },
+      { gloss: 'PLEASE' },
+      { gloss: 'THANKYOU' },
+      { gloss: 'WHO' },
     ],
   },
 ];
@@ -322,9 +350,9 @@ export function generateDrillTargetsForSign(
 // === Mastery distribution ==================================================
 
 /**
- * Assigns mastery levels to 38 of the 75 signs:
+ * Assigns mastery levels to 38 of the 96 signs:
  *   12 mastered + 9 known + 8 familiar + 5 learning + 4 new = 38 rows.
- * The remaining 37 signs are NOT in `mastery_state` (they're conceptually
+ * The remaining signs are NOT in `mastery_state` (they're conceptually
  * "new" / untouched).
  */
 export function distributeMastery(
@@ -340,14 +368,11 @@ export function distributeMastery(
   for (let i = 0; i < MASTERY_BUCKETS.learning; i++) levels.push('learning');
   for (let i = 0; i < MASTERY_BUCKETS.new; i++) levels.push('new');
 
-  // Spread the 38 touched signs across the 75-sign catalog so the
-  // distribution looks realistic. Step ≈ 2, leaving roughly half untouched.
-  const step = Math.floor(totalSigns / levels.length); // 75 / 38 = 1, so use a stride pattern
+  // Spread the 38 touched signs evenly across the catalog so the distribution
+  // looks realistic and the chosen indices stay unique for any catalog size.
   const indices: number[] = [];
-  let cursor = 0;
-  while (indices.length < levels.length) {
-    indices.push(cursor % totalSigns);
-    cursor += step + 1;
+  for (let i = 0; i < levels.length; i++) {
+    indices.push(Math.floor((i * totalSigns) / levels.length));
   }
 
   for (let i = 0; i < levels.length; i++) {
@@ -591,7 +616,11 @@ async function upsertCatalog(): Promise<{
     }
   }
 
-  // 2. Signs
+  // 2. Signs — wipe first so signs dropped from the catalog don't linger
+  // (a prior catalog's signs would otherwise stay attached to their lesson).
+  // drillDefinition, masteryState and repLog all cascade-delete off sign, so
+  // this clears the whole sign graph; mastery/rep are reseeded below.
+  await db.delete(sign);
   const allSigns = generateAllSigns();
   for (let g = 0; g < allSigns.length; g++) {
     const s = allSigns[g]!;

@@ -20,7 +20,7 @@ import {
  * account.
  */
 describe('seed data generators', () => {
-  it('catalog has 12 lessons with 75 signs total', () => {
+  it('catalog has 12 lessons with 96 signs total', () => {
     expect(LESSON_CATALOG).toHaveLength(12);
     const total = LESSON_CATALOG.reduce((acc, l) => acc + l.signs.length, 0);
     expect(total).toBe(TOTAL_SIGNS);
@@ -32,7 +32,7 @@ describe('seed data generators', () => {
     }
   });
 
-  it('generateAllSigns produces unique slugs for all 75 signs', () => {
+  it('generateAllSigns produces unique slugs for all 96 signs', () => {
     const signs = generateAllSigns();
     expect(signs).toHaveLength(TOTAL_SIGNS);
     const slugs = new Set(signs.map((s) => s.signSlug));
@@ -70,7 +70,7 @@ describe('seed data generators', () => {
     });
   });
 
-  it('mastery sign indices are unique within the 75-sign catalog', () => {
+  it('mastery sign indices are unique within the 96-sign catalog', () => {
     const dist = distributeMastery();
     const indices = new Set(dist.map((d) => d.signGlobalIndex));
     expect(indices.size).toBe(dist.length);

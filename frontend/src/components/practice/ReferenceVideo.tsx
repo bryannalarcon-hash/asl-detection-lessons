@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Play, RotateCcw, Repeat, Square } from 'lucide-react';
-import { MOCK_REFERENCE_VIDEO_URL, FALLBACK_VIDEO_URL } from '@/lib/constants';
+import { MOCK_REFERENCE_VIDEO_URL } from '@/lib/constants';
+import { videoSrcForSign } from '@/lib/lesson-config';
 import { cn } from '@/lib/utils';
 import type { DrillType } from '@/cv/types';
 
@@ -14,8 +15,8 @@ interface ReferenceVideoProps {
   /** Display credit string for the floating caption (e.g. "Maya R."). */
   signerCredit?: string;
   /**
-   * Dev Lesson Config overlay: per-sign clip source. When set, replaces the
-   * shared mock clip (still falls back to FALLBACK_VIDEO_URL on load error).
+   * Dev Lesson Config overlay: per-sign clip source. When set, overrides the
+   * sign's default clip (still falls back to the mock clip on load error).
    */
   videoSrc?: string;
   /**
@@ -41,7 +42,8 @@ const DRILL_LABEL: Record<DrillType, string> = {
  *  - Bottom-left floating playback pill: loop, 0.5×, 1×, replay, play/pause.
  *  - 3-pill segment timeline overlay so the user can see segment progress.
  *
- * v1: all signs share a single nyan cat clip (see constants.MOCK_REFERENCE_VIDEO_URL).
+ * Loads the sign's reference clip (/videos/lessons/<slug>.mp4), or a dev
+ * overlay clip, falling back to the mock clip on load error.
  * Plays the segment for the current drill:
  *   - handshape drill: 0 → 1/3 of duration
  *   - movement drill:  1/3 → 2/3
@@ -64,7 +66,9 @@ export function ReferenceVideo({
   className,
 }: ReferenceVideoProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [src, setSrc] = useState(videoSrc || MOCK_REFERENCE_VIDEO_URL);
+  // Default to the sign's real reference clip; a dev overlay videoSrc wins.
+  // On load error we fall back to the mock clip (a real, playable asset).
+  const [src, setSrc] = useState(videoSrc || videoSrcForSign(signSlug));
   const [slowMo, setSlowMo] = useState(false);
   const [autoLoop, setAutoLoop] = useState(true);
   const [duration, setDuration] = useState(0);
@@ -72,10 +76,10 @@ export function ReferenceVideo({
   // Re-render hook so the progress bar overlay updates smoothly.
   const [currentTime, setCurrentTime] = useState(0);
 
-  // Swap the source if the dev overlay changes the per-sign clip.
+  // Swap the source when the sign changes or a dev overlay sets a clip.
   useEffect(() => {
-    setSrc(videoSrc || MOCK_REFERENCE_VIDEO_URL);
-  }, [videoSrc]);
+    setSrc(videoSrc || videoSrcForSign(signSlug));
+  }, [videoSrc, signSlug]);
 
   // A present override (Practice maps an unset {0,0} trim to undefined) wins
   // over the fraction-based drill segment. A start-only trim (end <= start)
@@ -156,7 +160,7 @@ export function ReferenceVideo({
   };
 
   const handleError = () => {
-    if (src !== FALLBACK_VIDEO_URL) setSrc(FALLBACK_VIDEO_URL);
+    if (src !== MOCK_REFERENCE_VIDEO_URL) setSrc(MOCK_REFERENCE_VIDEO_URL);
   };
 
   const progress = duration > 0 ? currentTime / duration : 0;
