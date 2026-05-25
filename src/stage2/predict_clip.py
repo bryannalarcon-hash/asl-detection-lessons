@@ -35,7 +35,9 @@ sys.path.insert(0, str(REPO_ROOT))
 from src.stage2.data.extract_keypoints import (
     extract_one_clip, load_net1, load_net2, load_net3,
 )
-from src.stage2.data.sign_dataset import _build_per_frame_features, feature_dim
+from src.stage2.data.sign_dataset import (
+    _build_per_frame_features, feature_dim, window_to_model_input,
+)
 from src.stage2.models.sign_classifier import SignClassifier
 
 
@@ -76,11 +78,11 @@ def load_net4(ckpt_path: str, device: str
 
 
 def predict(clip_path: Path, net1, net1_k, net1_kslice, net2, net2_meta,
-            net3, net4, gloss_to_idx, net4_data_cfg, device: str,
-            topk: int = 3) -> dict:
+            net3, net3_head_type, net4, gloss_to_idx, net4_data_cfg,
+            device: str, topk: int = 3) -> dict:
     t_extract = time.time()
     result = extract_one_clip(net1, net1_k, net1_kslice, net2, net2_meta,
-                              net3, clip_path, device,
+                              net3, net3_head_type, clip_path, device,
                               max_frames=net4_data_cfg["max_frames"])
     if result is None:
         return {"clip": str(clip_path), "error": "extraction failed"}
@@ -92,19 +94,8 @@ def predict(clip_path: Path, net1, net1_k, net1_kslice, net2, net2_meta,
         include_lag1=net4_data_cfg["include_lag1"],
         include_lag2=net4_data_cfg["include_lag2"],
     )
-    T, C = feat.shape
-    Tmax = net4_data_cfg["max_frames"]
-    if T < Tmax:
-        pad = np.zeros((Tmax, C), dtype=np.float32)
-        pad[:T] = feat
-        feat = pad
-        valid_T = T
-    else:
-        idxs = np.linspace(0, T - 1, Tmax).astype(int)
-        feat = feat[idxs]
-        valid_T = Tmax
-    mask = np.ones(Tmax, dtype=bool)
-    mask[:valid_T] = False  # True = padded
+    T = feat.shape[0]
+    feat, mask = window_to_model_input(feat, net4_data_cfg["max_frames"])
     x = torch.from_numpy(feat).unsqueeze(0).to(device)
     m = torch.from_numpy(mask).unsqueeze(0).to(device)
     t_classify = time.time()
@@ -149,14 +140,14 @@ def main() -> None:
 
     net1, net1_k, net1_kslice = load_net1(args.net1, device)
     net2, net2_meta = load_net2(args.net2, device)
-    net3 = load_net3(args.net3, device)
+    net3, net3_head_type = load_net3(args.net3, device)
     net4, gloss_to_idx, net4_data_cfg = load_net4(args.net4, device)
     print(f"[init] all four nets loaded; {len(gloss_to_idx)} classes",
           flush=True)
 
     result = predict(Path(args.clip), net1, net1_k, net1_kslice, net2,
-                     net2_meta, net3, net4, gloss_to_idx, net4_data_cfg,
-                     device, topk=args.topk)
+                     net2_meta, net3, net3_head_type, net4, gloss_to_idx,
+                     net4_data_cfg, device, topk=args.topk)
     print(json.dumps(result, indent=2))
 
 

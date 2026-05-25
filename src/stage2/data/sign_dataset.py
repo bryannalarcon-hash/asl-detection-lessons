@@ -116,6 +116,34 @@ def _build_per_frame_features(kpts: np.ndarray, vis: np.ndarray,
     return np.concatenate(parts, axis=1).astype(np.float32)
 
 
+def window_to_model_input(feat: np.ndarray, max_frames: int
+                          ) -> tuple[np.ndarray, np.ndarray]:
+    """Pad/subsample a (T, C) feature window to the model's fixed length.
+
+    Mirrors the eval-time policy in ``SignSequenceDataset._pad_or_trim``
+    (deterministic, no augmentation): when shorter than ``max_frames`` the
+    window is zero-padded at the tail; when longer it is uniformly subsampled
+    to ``max_frames`` frames. Returns ``(feat_fixed, key_padding_mask)`` where
+    the mask is ``(max_frames,)`` bool with ``True`` marking padded steps —
+    the exact contract ``SignClassifier.forward`` expects.
+
+    Both the offline scorer (``predict_clip``) and the live demo call this so
+    the Net 4 input is built one way only.
+    """
+    T, C = feat.shape
+    if T >= max_frames:
+        idxs = np.linspace(0, T - 1, max_frames).astype(int)
+        out = feat[idxs].astype(np.float32)
+        valid_T = max_frames
+    else:
+        out = np.zeros((max_frames, C), dtype=np.float32)
+        out[:T] = feat
+        valid_T = T
+    mask = np.ones(max_frames, dtype=bool)
+    mask[:valid_T] = False  # True = padded
+    return out, mask
+
+
 class SignSequenceDataset(Dataset):
     """Per-clip dataset that yields (features, label, length).
 
