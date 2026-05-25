@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { lessonsApi } from '@/lib/api';
+import { isDevToolsEnabled } from '@/lib/env';
 import { useAppSettings } from '@/lib/settings';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -189,6 +190,16 @@ export default function LessonIntroPage() {
               >
                 ← {backLabel}
               </Link>
+              {isDevToolsEnabled() && (
+                <Link
+                  to="/dev/lesson-config"
+                  data-testid="dev-lesson-config-link"
+                  data-dev-override
+                  className="block rounded-md border border-status-warn/50 bg-status-warn/10 px-3 py-1.5 text-center font-mono text-[0.7rem] uppercase tracking-wider text-status-warn hover:bg-status-warn/20"
+                >
+                  [Dev: Lesson Config]
+                </Link>
+              )}
             </div>
           </div>
 

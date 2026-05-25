@@ -4,14 +4,18 @@ import { useMachine } from '@xstate/react';
 import { useQuery } from '@tanstack/react-query';
 import { RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { isDevToolsEnabled } from '@/lib/env';
 import { lessonsApi } from '@/lib/api';
 import { useAppSettings } from '@/lib/settings';
 import {
   practiceMachine,
   selectCurrentDrill,
   selectCurrentSign,
+  effectiveReps,
   type PracticeSign,
 } from '@/lib/machines/practice';
+import { readLessonConfig, type LessonConfig } from '@/lib/lesson-config';
+import { FALLBACK_SIGNS } from '@/lib/fallback-lesson';
 import { CameraPanel } from '@/components/practice/CameraPanel';
 import { ReferenceVideo } from '@/components/practice/ReferenceVideo';
 import { DrillIndicator } from '@/components/practice/DrillIndicator';
@@ -30,30 +34,6 @@ import {
 } from '@/lib/practice-resume';
 import type { DrillType } from '@/cv/types';
 
-// Fallback content when the backend isn't reachable.
-const FALLBACK_SIGNS: PracticeSign[] = [
-  {
-    id: '00000000-0000-0000-0000-000000000001',
-    slug: 'hello',
-    englishGloss: 'HELLO',
-    drills: [
-      { drillType: 'handshape', target: 'flat-B' },
-      { drillType: 'movement', target: 'forward-arc' },
-      { drillType: 'sign', target: 'HELLO' },
-    ],
-  },
-  {
-    id: '00000000-0000-0000-0000-000000000002',
-    slug: 'thank-you',
-    englishGloss: 'THANK YOU',
-    drills: [
-      { drillType: 'handshape', target: 'flat-B' },
-      { drillType: 'movement', target: 'forward-arc' },
-      { drillType: 'sign', target: 'THANK_YOU' },
-    ],
-  },
-];
-
 function buildSignsFromBackend(
   signs: { id: string; slug: string; englishGloss: string }[],
   drills: { signId: string; drillType: DrillType; targetString: string; orderIndex: number }[]
@@ -67,6 +47,32 @@ function buildSignsFromBackend(
       .sort((a, b) => a.orderIndex - b.orderIndex)
       .map((d) => ({ drillType: d.drillType, target: d.targetString })),
   }));
+}
+
+/**
+ * Apply a dev Lesson Config overlay onto the default signs. Each overlay drill
+ * names a sign (by slug) plus reps + video segment; the overlay's drill list
+ * defines the lesson's drill count and order. Unknown slugs are dropped. When
+ * a drill names a sign not in the defaults but resolvable, we still surface it
+ * with synthetic micro-drills so dev edits aren't silently swallowed.
+ */
+function applyLessonConfig(
+  defaults: PracticeSign[],
+  config: LessonConfig
+): PracticeSign[] {
+  const bySlug = new Map(defaults.map((s) => [s.slug, s]));
+  const out: PracticeSign[] = [];
+  for (const drill of config.drills) {
+    const base = bySlug.get(drill.sign);
+    if (!base) continue;
+    out.push({
+      ...base,
+      reps: drill.reps,
+      videoSrc: drill.videoSrc,
+      segment: drill.segment,
+    });
+  }
+  return out.length > 0 ? out : defaults;
 }
 
 export default function PracticePage() {
@@ -95,15 +101,22 @@ export default function PracticePage() {
   });
 
   const signs = useMemo<PracticeSign[]>(() => {
+    let base = FALLBACK_SIGNS;
     if (lessonQuery.data) {
       const built = buildSignsFromBackend(
         lessonQuery.data.signs,
         lessonQuery.data.drillDefinitions
       );
-      return built.length > 0 ? built : FALLBACK_SIGNS;
+      base = built.length > 0 ? built : FALLBACK_SIGNS;
     }
-    return FALLBACK_SIGNS;
-  }, [lessonQuery.data]);
+    // Dev-only overlay. Gated so prod (VITE_DEV_TOOLS=0) never reads or applies
+    // it — `isDevToolsEnabled()` collapses to `false` and DCE drops this branch.
+    if (isDevToolsEnabled()) {
+      const config = readLessonConfig(slug);
+      if (config) return applyLessonConfig(base, config);
+    }
+    return base;
+  }, [lessonQuery.data, slug]);
 
   // Resume cursor — restored from localStorage if recent (<7 days).
   const restored = useMemo(() => readResume(slug), [slug]);
@@ -179,6 +192,8 @@ export default function PracticePage() {
 
   const currentSign = selectCurrentSign(state.context);
   const currentDrill = selectCurrentDrill(state.context);
+  // Per-sign reps from the dev overlay (falls back to the machine default).
+  const repsForCurrentSign = effectiveReps(state.context);
   const drillTypes = useMemo<DrillType[]>(
     () => currentSign?.drills.map((d) => d.drillType) ?? ['handshape', 'movement', 'sign'],
     [currentSign]
@@ -240,7 +255,7 @@ export default function PracticePage() {
     drillIndex: state.context.drillIndex,
     drillTotal: drillTypes.length,
     repIndex: state.context.repIndex,
-    repTotal: state.context.repsPerDrill,
+    repTotal: repsForCurrentSign,
     signIndex: state.context.signIndex,
     signTotal: state.context.signs.length,
   });
@@ -296,7 +311,7 @@ export default function PracticePage() {
             </div>
             <RepCounter
               current={state.context.repIndex}
-              total={state.context.repsPerDrill}
+              total={repsForCurrentSign}
             />
           </section>
         )}
@@ -328,6 +343,8 @@ export default function PracticePage() {
               englishGloss={currentSign.englishGloss}
               drillType={currentDrill?.drillType}
               paused={paused}
+              videoSrc={currentSign.videoSrc}
+              segmentOverride={currentSign.segment}
             />
           )}
           {!showCamera && !showReference && currentSign && (

@@ -1,6 +1,8 @@
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, type RouteObject } from 'react-router-dom';
+import { isDevToolsEnabled } from '@/lib/env';
 import { AppShell } from '@/components/layout/AppShell';
 import { AuthShell } from '@/components/layout/AuthShell';
+import DevLessonConfigPage from '@/pages/DevLessonConfig';
 
 import LandingPage from '@/pages/Landing';
 import SignUpPage from '@/pages/SignUp';
@@ -25,6 +27,13 @@ import AboutPage from '@/pages/About';
 import CameraDeniedPage from '@/pages/CameraDenied';
 import OfflinePage from '@/pages/Offline';
 import NotFoundPage from '@/pages/NotFound';
+
+// Dev-only routes. `isDevToolsEnabled()` collapses to a constant at build
+// time (Vite inlines VITE_DEV_TOOLS), so DCE drops both this array's contents
+// and the DevLessonConfigPage import from prod bundles when VITE_DEV_TOOLS=0.
+const devRoutes: RouteObject[] = isDevToolsEnabled()
+  ? [{ path: '/dev/lesson-config', element: <DevLessonConfigPage /> }]
+  : [];
 
 export const router = createBrowserRouter([
   // Pages with no top nav (public/landing + auth)
@@ -66,6 +75,7 @@ export const router = createBrowserRouter([
       { path: '/about', element: <AboutPage /> },
       { path: '/errors/camera-denied', element: <CameraDeniedPage /> },
       { path: '/errors/offline', element: <OfflinePage /> },
+      ...devRoutes,
     ],
   },
 

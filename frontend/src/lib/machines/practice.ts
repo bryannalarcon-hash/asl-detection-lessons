@@ -8,6 +8,15 @@ export interface PracticeSign {
   slug: string;
   englishGloss: string;
   drills: { drillType: DrillType; target: string }[];
+  /**
+   * Per-sign rep count, overlaid from the dev Lesson Config. When set it wins
+   * over the context-level `repsPerDrill` default. Drives `hasMoreReps`.
+   */
+  reps?: number;
+  /** Reference-clip source for this sign (dev Lesson Config overlay). */
+  videoSrc?: string;
+  /** Reference-clip sub-range in seconds (dev Lesson Config overlay). */
+  segment?: { startSec: number; endSec: number };
 }
 
 export interface PracticeContext {
@@ -51,7 +60,8 @@ export const practiceMachine = setup({
     input: {} as CreateInput,
   },
   guards: {
-    hasMoreReps: ({ context }) => context.repIndex + 1 < context.repsPerDrill,
+    hasMoreReps: ({ context }) =>
+      context.repIndex + 1 < effectiveReps(context),
     hasMoreDrills: ({ context }) => {
       const sign = context.signs[context.signIndex];
       if (!sign) return false;
@@ -198,6 +208,21 @@ function clampIdx(v: number | undefined, lo: number, hi: number): number {
 }
 
 // === Selectors ===
+
+/**
+ * Reps the current sign requires: the per-sign overlay value when present,
+ * else the context-level `repsPerDrill` default. Kept >=1 so a 0/NaN overlay
+ * can't strand the machine.
+ */
+export function effectiveReps(ctx: PracticeContext): number {
+  const sign = ctx.signs[ctx.signIndex];
+  const perSign = sign?.reps;
+  const reps =
+    typeof perSign === 'number' && Number.isFinite(perSign) && perSign > 0
+      ? Math.trunc(perSign)
+      : ctx.repsPerDrill;
+  return Math.max(1, reps);
+}
 
 export function selectCurrentSign(ctx: PracticeContext): PracticeSign | null {
   return ctx.signs[ctx.signIndex] ?? null;

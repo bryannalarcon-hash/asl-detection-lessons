@@ -13,6 +13,17 @@ interface ReferenceVideoProps {
   paused?: boolean;
   /** Display credit string for the floating caption (e.g. "Maya R."). */
   signerCredit?: string;
+  /**
+   * Dev Lesson Config overlay: per-sign clip source. When set, replaces the
+   * shared mock clip (still falls back to FALLBACK_VIDEO_URL on load error).
+   */
+  videoSrc?: string;
+  /**
+   * Dev Lesson Config overlay: absolute-seconds sub-range to show. When both
+   * bounds are >0 and end>start, this wins over the fraction-based drill
+   * segments. endSec is clamped to the clip duration.
+   */
+  segmentOverride?: { startSec: number; endSec: number };
   className?: string;
 }
 
@@ -48,10 +59,12 @@ export function ReferenceVideo({
   drillType = 'handshape',
   paused: pausedProp = false,
   signerCredit = 'Maya R.',
+  videoSrc,
+  segmentOverride,
   className,
 }: ReferenceVideoProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [src, setSrc] = useState(MOCK_REFERENCE_VIDEO_URL);
+  const [src, setSrc] = useState(videoSrc || MOCK_REFERENCE_VIDEO_URL);
   const [slowMo, setSlowMo] = useState(false);
   const [autoLoop, setAutoLoop] = useState(true);
   const [duration, setDuration] = useState(0);
@@ -59,9 +72,25 @@ export function ReferenceVideo({
   // Re-render hook so the progress bar overlay updates smoothly.
   const [currentTime, setCurrentTime] = useState(0);
 
+  // Swap the source if the dev overlay changes the per-sign clip.
+  useEffect(() => {
+    setSrc(videoSrc || MOCK_REFERENCE_VIDEO_URL);
+  }, [videoSrc]);
+
+  const useOverride =
+    !!segmentOverride &&
+    segmentOverride.endSec > segmentOverride.startSec &&
+    segmentOverride.endSec > 0;
+
   const segment = segmentForDrill(drillType);
-  const segStart = duration * segment.start;
-  const segEnd = duration * segment.end;
+  // Override wins (absolute seconds, clamped to clip duration); else fall back
+  // to the fraction-based drill segment.
+  const segStart = useOverride
+    ? clamp(segmentOverride.startSec, 0, duration || segmentOverride.startSec)
+    : duration * segment.start;
+  const segEnd = useOverride
+    ? clamp(segmentOverride.endSec, segStart, duration || segmentOverride.endSec)
+    : duration * segment.end;
 
   // Reset to segment start when drill changes
   useEffect(() => {
@@ -105,7 +134,9 @@ export function ReferenceVideo({
     const v = videoRef.current;
     if (!v) return;
     setDuration(v.duration);
-    v.currentTime = v.duration * segment.start;
+    v.currentTime = useOverride
+      ? clamp(segmentOverride.startSec, 0, v.duration)
+      : v.duration * segment.start;
     v.play().catch(() => undefined);
   };
 
