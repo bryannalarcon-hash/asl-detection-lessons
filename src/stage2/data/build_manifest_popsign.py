@@ -60,6 +60,21 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
+import numpy as np
+
+
+def gloss_in_npz(npz_path: Path) -> str | None:
+    """The PopSign sign token the extractor stored in the .npz at extraction
+    time (authoritative; the clip filename carries the sign in the MIDDLE, not
+    as a prefix, so filename matching alone misses it). Lowercased token."""
+    try:
+        with np.load(npz_path, allow_pickle=False) as d:
+            if "gloss" in d:
+                return str(d["gloss"]).strip().lower()
+    except Exception:
+        return None
+    return None
+
 
 def to_gloss(sign: str) -> str:
     """PopSign tar name -> our catalog UPPER_SNAKE token (e.g. icecream->ICECREAM)."""
@@ -195,7 +210,12 @@ def main() -> None:
     with out_path.open("w") as fh:
         for npz in npz_files:
             clip_id = npz.stem
-            gloss = sign_for_clip(clip_id, gloss_for_token)
+            # Prefer the gloss token the extractor stored inside the .npz
+            # (authoritative); fall back to parsing the filename stem.
+            token = gloss_in_npz(npz)
+            gloss = gloss_for_token.get(token) if token else None
+            if gloss is None:
+                gloss = sign_for_clip(clip_id, gloss_for_token)
             if gloss is None:
                 n_skip += 1
                 continue
