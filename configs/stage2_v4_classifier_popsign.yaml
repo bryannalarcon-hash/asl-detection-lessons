@@ -1,0 +1,51 @@
+run_name: stage2_v4_classifier_popsign_v1
+
+data:
+  # PopSign-only ASL-1 vocabulary. sign_list_json is the source of truth for
+  # the label set; the trainer derives num_classes from len(gloss_to_idx)
+  # (build_gloss_to_idx over glosses_flat), so model.num_classes below is only
+  # a documentation hint and is NOT read for sizing the head.
+  sign_list_json: data/signs/popsign_sign_list.json
+  manifest_path: data/signs/popsign_manifest.jsonl
+  kpt_dir: data/signs/popsign_kpt_cache
+  max_frames: 64
+  include_visibility: true
+  include_lag1: true
+  include_lag2: true
+
+model:
+  # Authoritative class count comes from the sign list at train time; this
+  # value mirrors the popsign_vocab.json size for reference only.
+  num_classes: 96
+  dim: 192
+  kernel: 17
+  drop_path: 0.2
+  late_dropout_p: 0.8
+  late_dropout_start_step: 4000
+
+train:
+  batch_size: 128
+  num_workers: 8
+  epochs: 100
+  lr: 1.0e-3
+  lr_min: 1.0e-5
+  warmup_epochs: 3
+  weight_decay: 1.0e-4
+  grad_clip: 1.0
+  ema_decay: 0.9995
+  mixed_precision: true
+  use_bf16: true
+  label_smoothing: 0.1
+  early_stop_patience: 20
+  early_stop_min_delta: 0.001
+  log_every: 50
+  val_every: 1
+  checkpoint_dir: checkpoints/stage2_v4_classifier_popsign_v1
+  seed: 42
+  s3_bucket: ""
+  s3_prefix: net4/checkpoints_popsign
+  s3_sync_every: 10
+
+eval:
+  val_batch_size: 128
+  topk: [1, 3]

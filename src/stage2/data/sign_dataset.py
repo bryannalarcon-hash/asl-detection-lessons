@@ -33,13 +33,21 @@ FACE_BODY_INDICES = S.FACE_INDICES + S.BODY_INDICES  # nose/chin/forehead + 4 bo
 
 def _normalise_frame(kpts: np.ndarray, vis: np.ndarray,
                      W: int, H: int) -> np.ndarray:
-    """Anchor + scale invariance on a single frame.
+    """Per-part normalization: body-scale for face/body, hand-scale for hands.
 
-    Anchor at the centroid of visible face+body keypoints (Net 1's K=7
-    output). Scale by their bounding span. Falls back to frame-mid +
-    half-width when no body keypoint is visible.
+    Face/body keypoints are anchored on their centroid and divided by their
+    bounding span (gross position, body-scale). The two hands are then
+    RE-NORMALIZED by their OWN size: each hand's wrist is kept at its
+    body-normalized location (so sign *location* is preserved) while the
+    finger offsets are divided by that hand's own span (so *handshape* spans
+    the feature range instead of being ~1% of shoulder width).
 
-    kpts: (49, 2), vis: (49,)  →  (49, 2) roughly in [-1, 1].
+    This recovers the hand-relative scale that the detect→crop→landmark
+    cascade produces and that `extract_keypoints.py` discards when it
+    unprojects Net 3's crop coords back to frame space. No keypoint is used
+    as a global anchor; hands self-scale, body keeps body-scale.
+
+    kpts: (49, 2), vis: (49,)  →  (49, 2).
     """
     fb_vis = vis[FACE_BODY_INDICES] > 0.5
     if fb_vis.sum() >= 1:
@@ -58,6 +66,25 @@ def _normalise_frame(kpts: np.ndarray, vis: np.ndarray,
     if span < 1e-3:
         span = max(W, H) * 0.5
     out = (kpts - centre) / max(span, 1.0)
+
+    # Per-hand scale recovery. For each hand: keep the wrist at its
+    # body-normalized position, but rescale the finger offsets by the hand's
+    # own span so handshape detail is not crushed by the shoulder-scale span.
+    for hstart in (S.RIGHT_HAND_START, S.LEFT_HAND_START):
+        sl = slice(hstart, hstart + 21)
+        hvis = vis[sl] > 0.5
+        if hvis.sum() < 3:
+            continue
+        hand = kpts[sl]
+        hand_vis_pts = hand[hvis]
+        hand_span = float(np.linalg.norm(hand_vis_pts.max(axis=0)
+                                         - hand_vis_pts.min(axis=0)))
+        if hand_span < 1e-3:
+            continue
+        wrist = hand[0]                              # kp0 = wrist (frame coords)
+        body_norm_wrist = (wrist - centre) / max(span, 1.0)
+        out[sl] = body_norm_wrist + (hand - wrist) / hand_span
+
     # Zero-out invisibles so they don't contribute through lag deltas.
     mask = (vis > 0.5).astype(np.float32)[:, None]
     return (out * mask).astype(np.float32)

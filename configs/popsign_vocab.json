@@ -1,0 +1,26 @@
+{
+  "source": "PopSign v1.0 (CC BY 4.0). Vocabulary drawn from PopSign's 250-word CDI set so every sign has >=500 real clips from a single source.",
+  "note": "Words are PopSign sign-tar names (lowercase). Categories mirror docs/handoffs/net4_data_sourcing.md. Verify per-sign verified counts at extraction time and drop any below 500, replacing with a same-category PopSign word to keep the count near ~85-96.",
+  "tar_url_template": "https://signdata.cc.gatech.edu/data/popsign_v1_0/game/train/{sign}.tar",
+  "categories": {
+    "People": ["mom", "dad", "brother", "grandma", "grandpa", "aunt", "uncle", "boy", "girl"],
+    "Animals": ["dog", "cat", "bird", "fish", "horse", "cow", "pig", "duck", "frog", "lion", "elephant", "owl", "bee", "mouse"],
+    "Colors": ["red", "blue", "green", "yellow", "black", "white", "brown", "orange"],
+    "Food": ["apple", "milk", "water", "carrot", "chocolate", "pizza", "icecream", "drink", "food"],
+    "Verbs": ["go", "give", "look", "see", "read", "like", "have", "make", "jump", "dance", "ride", "sleep", "talk", "hear", "find"],
+    "Feelings": ["happy", "sad", "mad", "sick", "sleepy", "thirsty", "pretty", "cute", "hot", "dirty", "fine"],
+    "Time": ["now", "morning", "night", "tomorrow", "yesterday"],
+    "Places": ["home", "store", "bedroom", "bathroom", "outside"],
+    "Household": ["bed", "chair", "table", "book", "pen", "shirt", "shoe", "hat", "toy"],
+    "Body": ["eye", "ear", "nose", "mouth", "head", "hair"],
+    "Social": ["yes", "no", "please", "thankyou", "who"]
+  },
+  "popsign_tar_aliases": {
+    "city": "downtown",
+    "school": "playgroundschool",
+    "angry": "mad",
+    "want": "wantto",
+    "need": "needneedto",
+    "goodbye": "bye"
+  }
+}
