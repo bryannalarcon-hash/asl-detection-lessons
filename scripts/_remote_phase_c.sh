@@ -15,7 +15,10 @@ cd /workspace/asl
 export PYTHONUNBUFFERED=1
 mkdir -p logs work data/signs/popsign_kpt_cache
 
-MAX_PER_SIGN="${MAX_PER_SIGN:-300}"
+# Extraction is ~5s/clip (Net1+Net2+Net3 over the frames), so total clips is
+# the cost lever. 40/sign x 96 signs is enough to train a Net 4 that
+# demonstrates the e2e pipeline (~2 hr / ~$2); raise later for accuracy.
+MAX_PER_SIGN="${MAX_PER_SIGN:-40}"
 NET1=results/v3/net1_v3_1/best_export.pt
 NET2=results/v3/net2/best.pt
 NET3=results/v3/net3/best.pt
@@ -72,7 +75,8 @@ for sign in "${SIGNS[@]}"; do
         --out "work/${sign}.jsonl" --max-per-sign "$MAX_PER_SIGN" 2>&1 | tee -a logs/phasec.log
     python3 -m src.stage2.data.extract_keypoints \
         --manifest "work/${sign}.jsonl" --net1 "$NET1" --net2 "$NET2" --net3 "$NET3" \
-        --out "$KPT_OUT" --max-frames 64 --delete-after 2>&1 | tee -a logs/extract.log
+        --out "$KPT_OUT" --max-frames 32 --no-two-pass --delete-after \
+        2>&1 | tee -a logs/extract.log
     rm -rf "work/${sign}" "work/${sign}.jsonl"
     ok=$((ok+1))
     echo "[phasec] $sign done ($ok ok / $miss miss); npz=$(ls "$KPT_OUT" | wc -l); df: $(df -h /workspace | awk 'NR==2{print $4" free"}')"
