@@ -14,6 +14,12 @@ ROLE="${1:?usage: _remote_train.sh <net2|net3>}"
 export PYTHONUNBUFFERED=1
 mkdir -p logs checkpoints
 
+echo "[remote:$ROLE] $(date -u) installing system tools"
+# The runpod/pytorch image is minimal: no unzip/wget/rsync, which the dataset
+# download scripts need (COCO zip, kaggle --unzip, HaGRID, InterHand wget).
+apt-get update -qq >/dev/null 2>&1 || true
+apt-get install -y -qq unzip wget rsync curl git >/dev/null 2>&1 || true
+
 echo "[remote:$ROLE] $(date -u) installing deps"
 pip install -q -r requirements.txt
 pip install -q --upgrade kaggle gdown >/dev/null 2>&1 || true
