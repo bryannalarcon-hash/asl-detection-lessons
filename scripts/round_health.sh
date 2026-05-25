@@ -39,7 +39,10 @@ while read -r tag role pod_id host port rdir; do
         log "[${role}] pod ${pod_id} unreachable (busy/rebooting) host=${host}:${port}"
         continue
     fi
-    procs=$("${SSH[@]}" "pgrep -af 'train_v3_detector|train_v3_landmark_reg|extract_keypoints|train_v4_classifier' | head -1" 2>/dev/null || true)
+    # Filter to real python trainer processes; the [p]ython trick + grep avoids
+    # the pgrep shell self-matching its own pattern string and reporting a
+    # false "alive" while the pod is only downloading.
+    procs=$("${SSH[@]}" "pgrep -af 'train_v3_detector|train_v3_landmark_reg|extract_keypoints|train_v4_classifier' | grep -E '[p]ython -u -m' | head -1" 2>/dev/null || true)
     markers=$("${SSH[@]}" "ls -1 /workspace/asl/.*_done 2>/dev/null | tr '\n' ' '" 2>/dev/null || true)
     if [ -n "${procs}" ]; then
         log "[${role}] HEALTH alive: ${procs}"
