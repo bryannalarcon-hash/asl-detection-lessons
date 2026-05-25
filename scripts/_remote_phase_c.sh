@@ -61,7 +61,10 @@ for sign in "${SIGNS[@]}"; do
             --max-time 3600 -o "$tarf" "$url" 2>>logs/phasec.log; then
         echo "[phasec] WARN $sign download failed after retries; skipping"; rm -f "$tarf"; continue
     fi
-    if ! tar -xf "$tarf" -C work/ 2>>logs/phasec.log; then
+    # --no-same-owner: PopSign tars carry the GT researcher's uid/gid; as root
+    # tar would try to chown to a nonexistent uid, fail, and exit nonzero even
+    # though the files extract fine. Without this the whole sign is skipped.
+    if ! tar --no-same-owner -xf "$tarf" -C work/ 2>>logs/phasec.log; then
         echo "[phasec] WARN $sign extract failed; skipping"; rm -rf "$tarf" "work/${sign}"; continue
     fi
     rm -f "$tarf"
