@@ -17,6 +17,9 @@ note `project_net_v3_regression_round.md`.
 ## Active
 
 ### ML training track
+- **`HANDOFF_REGRESSION_ROUND.md`** — CURRENT. The regression round + e2e +
+  final-deliverables resume point: what's trained, what's running (Phase C →
+  Net 4), the net2 decision, infra/tooling, deliverables status, next steps.
 - **`HANDOFF_MEDIAPIPE_GAP.md`** — the ranked MediaPipe-gap action plan
   (regression Net 3, ROI tracking, Net 2 keypoints, Net 4 per-hand norm,
   checkpoint hygiene, INT8). The doctrine for the current round.
