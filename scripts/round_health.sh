@@ -26,7 +26,10 @@ while read -r tag role pod_id host port rdir; do
     [ "${tag:-}" = "POD" ] || continue
     ldir="${REPO_ROOT}/results/v3/${role}"
     mkdir -p "${ldir}"
-    SSH=(ssh -i "${KEY}" -o IdentitiesOnly=yes -o ConnectTimeout=12 -o BatchMode=yes
+    # -n redirects ssh stdin from /dev/null: without it, ssh consumes the
+    # while-read loop's stdin (the .round_env file) and the loop processes
+    # only the first pod.
+    SSH=(ssh -n -i "${KEY}" -o IdentitiesOnly=yes -o ConnectTimeout=12 -o BatchMode=yes
          -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p "${port}" "root@${host}")
     scp_pull() { scp -i "${KEY}" -o IdentitiesOnly=yes -o ConnectTimeout=12 \
                  -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
