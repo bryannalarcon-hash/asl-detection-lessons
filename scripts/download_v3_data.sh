@@ -143,7 +143,9 @@ else
 fi
 
 # ----- InterHand2.6M -----
-if [ "$NET2_ONLY" = "1" ]; then
+if [ "${SKIP_INTERHAND:-0}" = "1" ]; then
+    echo "=== InterHand2.6M: skipped (SKIP_INTERHAND=1; mix renormalizes to FreiHAND+RHD) ==="
+elif [ "$NET2_ONLY" = "1" ]; then
     echo "=== InterHand2.6M: skipped (--net2-only) ==="
 elif [ -d "$DATA_DIR/interhand/annotations/train" ] \
    && ls "$DATA_DIR/interhand/annotations/train"/*.json >/dev/null 2>&1; then

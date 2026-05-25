@@ -54,6 +54,10 @@ case "$ROLE" in
         2>&1 | tee -a logs/train_net2.log
     touch .net2_done ;;
   net3)
+    # Skip InterHand2.6M (85GB) this round: keeps the disk small (~40GB) so
+    # the pod provisions reliably, and the mix sampler renormalizes to
+    # FreiHAND + RHD. Unset SKIP_INTERHAND to include it (needs ~130GB disk).
+    export SKIP_INTERHAND="${SKIP_INTERHAND:-1}"
     bash scripts/download_v3_data.sh --net3-only 2>&1 | tee -a logs/download.log
     echo "[remote:net3] TRAIN regression landmark"
     python -u -m src.stage1.train_v3_landmark_reg \
