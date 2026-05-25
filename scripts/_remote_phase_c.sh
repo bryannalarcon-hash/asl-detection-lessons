@@ -19,6 +19,15 @@ mkdir -p logs work data/signs/popsign_kpt_cache
 # the cost lever. 40/sign x 96 signs is enough to train a Net 4 that
 # demonstrates the e2e pipeline (~2 hr / ~$2); raise later for accuracy.
 MAX_PER_SIGN="${MAX_PER_SIGN:-40}"
+# OFFSET skips the first N clips/sign (deterministic sorted order) so a parallel
+# pod can extract a disjoint slice (e.g. OFFSET=40 MAX_PER_SIGN=85 -> clips 41-125).
+OFFSET="${OFFSET:-0}"
+# BATCHED=1 uses the GPU-batched extractor (one forward per net per clip).
+BATCHED="${BATCHED:-0}"
+# TRAIN_NET4=0 extracts keypoints only (top-up pods that merge later); =1 also
+# builds the Net 4 manifest and trains the classifier.
+TRAIN_NET4="${TRAIN_NET4:-1}"
+BATCHED_FLAG=""; [ "$BATCHED" = "1" ] && BATCHED_FLAG="--batched"
 NET1=results/v3/net1_v3_1/best_export.pt
 # net2_v3_1 is the stronger detector (AP 0.20 vs the new kpt net2's 0.016 on
 # COCO-WholeBody val). It has no keypoint head, so Net 3 self-orients via the
@@ -75,10 +84,10 @@ for sign in "${SIGNS[@]}"; do
     fi
     rm -f "$tarf"
     python3 scripts/build_clip_manifest.py --work-dir work --signs "$sign" \
-        --out "work/${sign}.jsonl" --max-per-sign "$MAX_PER_SIGN" 2>&1 | tee -a logs/phasec.log
+        --out "work/${sign}.jsonl" --max-per-sign "$MAX_PER_SIGN" --offset "$OFFSET" 2>&1 | tee -a logs/phasec.log
     python3 -m src.stage2.data.extract_keypoints \
         --manifest "work/${sign}.jsonl" --net1 "$NET1" --net2 "$NET2" --net3 "$NET3" \
-        --out "$KPT_OUT" --max-frames 32 --delete-after \
+        --out "$KPT_OUT" --max-frames 32 --delete-after $BATCHED_FLAG \
         2>&1 | tee -a logs/extract.log
     rm -rf "work/${sign}" "work/${sign}.jsonl"
     ok=$((ok+1))
@@ -86,13 +95,21 @@ for sign in "${SIGNS[@]}"; do
 done
 
 echo "[phasec] extraction complete: $ok signs, $(ls "$KPT_OUT" | wc -l) npz files"
+touch .extract_done
+
+if [ "$TRAIN_NET4" != "1" ]; then
+    echo "[phasec] TRAIN_NET4=0 — keypoint-only run (top-up); skipping manifest+train"
+    touch .topup_done
+    echo "[phasec] DONE $(date -u) — top-up keypoints extracted ($(ls "$KPT_OUT" | wc -l) npz)"
+    exit 0
+fi
+
 echo "[phasec] building Net 4 manifest"
 python3 -m src.stage2.data.build_manifest_popsign \
     --vocab configs/popsign_vocab.json --kpt-dir "$KPT_OUT" \
     --sign-list-out data/signs/popsign_sign_list.json \
     --manifest-out data/signs/popsign_manifest.jsonl \
     --val-frac 0.1 --test-frac 0.1 --seed 42 2>&1 | tee -a logs/phasec.log
-touch .extract_done
 
 echo "[phasec] $(date -u) training Net 4"
 python3 -m src.stage2.train_v4_classifier \

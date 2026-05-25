@@ -532,6 +532,11 @@ def main() -> None:
                    help="Disable the 2nd oriented Net 3 pass when Net 2 has "
                         "no keypoint head. Halves Net 3 cost at the price of "
                         "axis-aligned (unrotated) crops for those hands.")
+    p.add_argument("--batched", action="store_true",
+                   help="Use the GPU-batched extractor "
+                        "(extract_one_clip_batched): one forward per network "
+                        "per clip instead of one per frame. Output is "
+                        "equivalent to the per-frame reference path.")
     args = p.parse_args()
 
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
@@ -541,6 +546,13 @@ def main() -> None:
     net2, net2_meta = load_net2(args.net2, device)
     net3, net3_head_type = load_net3(args.net3, device)
     two_pass = not args.no_two_pass
+    if args.batched:
+        from src.stage2.data.extract_keypoints_batched import (
+            extract_one_clip_batched)
+        extract_fn = extract_one_clip_batched
+        print("[init] using batched extractor", flush=True)
+    else:
+        extract_fn = extract_one_clip
     print(f"[init] net1 K={net1_k} slice={net1_kslice}", flush=True)
     print(f"[init] net2 input={net2_meta['input_size']} "
           f"anchors={net2_meta['anchors_xywh'].shape}", flush=True)
@@ -570,11 +582,11 @@ def main() -> None:
                 print(f"[miss] {clip_path}", flush=True)
                 n_fail += 1
                 continue
-            result = extract_one_clip(net1, net1_k, net1_kslice, net2,
-                                      net2_meta, net3, net3_head_type,
-                                      clip_path, device,
-                                      max_frames=args.max_frames,
-                                      two_pass_fallback=two_pass)
+            result = extract_fn(net1, net1_k, net1_kslice, net2,
+                                net2_meta, net3, net3_head_type,
+                                clip_path, device,
+                                max_frames=args.max_frames,
+                                two_pass_fallback=two_pass)
             if result is None:
                 n_fail += 1
                 print(f"[fail] {clip_path}", flush=True)

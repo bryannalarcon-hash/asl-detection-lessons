@@ -28,6 +28,10 @@ def main() -> None:
                     help="Dir containing <sign>/ subdirs of clips.")
     ap.add_argument("--out", required=True)
     ap.add_argument("--max-per-sign", type=int, default=300)
+    ap.add_argument("--offset", type=int, default=0,
+                    help="Skip the first N clips per sign (deterministic sorted "
+                         "order), so a parallel run can extract a disjoint slice "
+                         "(e.g. --offset 40 --max-per-sign 85 takes clips 41-125).")
     ap.add_argument("--signs", nargs="*", default=None,
                     help="Restrict to these sign dirs (default: all subdirs).")
     args = ap.parse_args()
@@ -47,8 +51,11 @@ def main() -> None:
         for d in sign_dirs:
             clips = sorted(p for p in d.iterdir()
                            if p.suffix.lower() in VIDEO_EXTS)
+            off = max(0, args.offset)
             if args.max_per_sign > 0:
-                clips = clips[: args.max_per_sign]
+                clips = clips[off : off + args.max_per_sign]
+            elif off:
+                clips = clips[off:]
             for clip in clips:
                 f.write(json.dumps({
                     "clip_path": str(clip),
