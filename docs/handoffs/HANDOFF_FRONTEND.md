@@ -277,6 +277,43 @@ Run with: `DATABASE_URL=postgres://asl:asl_dev_only@localhost:5433/asl_pilot npx
 5. **Lesson Catalog polish**: search, filter, sort, mastered overlay polish.
 6. **Account Settings / Notification Preferences / Privacy / Help / About** pages — currently placeholders.
 7. **Streak freeze UI**: surface `freezesRemaining` in the dashboard.
+8. **Port live sign verification to TS + ship INT8-quantized models**: translate `src/stage2/sign_verifier.py` (the reference impl) to the browser, and quantize Nets 1-4 to INT8 for in-browser/WASM inference. See the design note below.
+
+---
+
+## Live sign verification (sliding-window persistence)
+
+The lesson loop shows ONE target sign and confirms the user produces it from a
+live webcam stream. This is VERIFICATION (known target), not open-set
+recognition — strictly easier and more robust: we only ever ask "is the target
+class confident, consistently, while the hand moves?"
+
+Net 4 is trained on pre-segmented ~30-frame clips and has NO neutral/"no-sign"
+class — that is fine, because the target framing means we never ask "what sign
+is this?" on a still or absent hand. We slide a `window_len`≈30-frame window
+(roughly one sign's duration; 10 is too short for a net trained on ~30-frame
+clips) every `stride` frames, gate each window by motion + presence, and fire
+when a `vote_frac` fraction of the MOTION-GATED windows in the last `span_sec`
+put the TARGET class above `conf_thresh`. We use the target-class probability
+(not top-1) so a consistent close-#2 still verifies, plus `hold_sec`
+hysteresis so a verified state doesn't flicker.
+
+Motion/presence gate: mean per-frame keypoint velocity over the window
+(computed on RAW pixel coords, since the model features are scale-normalised)
+>= `motion_min_speed`, AND fraction of frames with a hand present >=
+`presence_min`. Ungated windows never spend the classifier and never vote, so
+votes don't accumulate on a still or absent hand.
+
+Tunable knobs (all in the `SignVerifier` constructor): `window_len`, `stride`,
+`span_sec`, `fps`, `conf_thresh`, `vote_frac`, `motion_min_speed`,
+`presence_min`, `min_gated_windows`, `hold_sec`. The classifier is INJECTED as
+a callable `classify(window (T,feat_dim)) -> probs (num_classes,)` plus a
+`gloss_to_idx` map, so the module is pure-numpy, decoupled from Net 4/torch,
+and unit-testable. Per-frame features reuse Net 4's own
+`sign_dataset._build_per_frame_features` so live features match training.
+
+`src/stage2/sign_verifier.py` is the REFERENCE for the eventual TS/browser
+port (action item #8), which also needs INT8-quantized models.
 
 ---
 
