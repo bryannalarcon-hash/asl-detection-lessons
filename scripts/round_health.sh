@@ -71,7 +71,7 @@ while read -r tag role pod_id host port rdir; do
 import sys, json
 try:
     d = json.loads(sys.stdin.read())
-    ks = [k for k in ('val_pck_05','val_pck_10','val_pck_20','top1','top3','val_acc','mAP','train_loss') if k in d]
+    ks = [k for k in ('val_pck_05','val_pck_10','val_pck_20','top1','top3','val_acc','mAP','train_loss','cls_loss','box_loss','kpt_loss') if k in d]
     print('METRIC ${role} epoch=' + str(d.get('epoch','?')) + ' ' + ' '.join(f'{k}={d[k]}' for k in ks))
 except Exception as e:
     print('METRIC ${role} parse_error: ' + str(e))" | tee -a "${LOG_FILE}"
