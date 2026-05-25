@@ -40,11 +40,11 @@ ulimit -n 65536 || true
 case "$ROLE" in
   net2)
     bash scripts/download_v3_data.sh --net2-only 2>&1 | tee -a logs/download.log
-    echo "[remote:net2] building 256px cache"
-    python -u scripts/build_net2_cache.py --cache-root data/net2_cache \
-        --input-size 256 --sources hagrid,coco,freihand,egohands,synthetic \
-        --workers 32 2>&1 | tee -a logs/cache.log
-    echo "[remote:net2] STAGE A (hagrid-only)"
+    # No mmap cache: at 256px it would be ~127GB (HaGRID alone is 500k images)
+    # and overflow any reasonably-sized disk. The dataset falls back to cv2
+    # JPEG decode; the forced numpy anchor matcher (n_kpts>0) is the bottleneck
+    # anyway, so the cache's I/O speedup is largely moot here.
+    echo "[remote:net2] STAGE A (hagrid-only, raw JPEG dataset)"
     python -u -m src.stage1.train_v3_detector \
         --config configs/stage1_v3_detector_kpt.yaml --stage stage_a \
         2>&1 | tee -a logs/train_net2.log

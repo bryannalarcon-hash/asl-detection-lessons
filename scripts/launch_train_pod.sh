@@ -90,9 +90,11 @@ rm -f "$ENVF"
 "${SSH[@]}" "cd /workspace/asl && chmod +x scripts/_remote_train.sh && \
     setsid bash scripts/_remote_train.sh $ROLE >logs/remote_$ROLE.log 2>&1 </dev/null & \
     disown; echo launched"
-sleep 3
-"${SSH[@]}" "pgrep -f 'scripts/_remote_train.sh $ROLE' >/dev/null" \
-    || { echo "[FATAL] remote training process did not start"; exit 7; }
+sleep 5
+# Liveness via log output, NOT pgrep: pgrep -f would self-match the SSH shell
+# running pgrep (its arg string contains the script name) and always pass.
+"${SSH[@]}" "grep -q 'installing system tools' /workspace/asl/logs/remote_$ROLE.log 2>/dev/null" \
+    || { echo "[FATAL] remote training did not begin (no log output)"; exit 7; }
 
 echo "[6/6] recording pod to .round_env"
 # .round_env line: POD <role> <pod_id> <host> <port> <remote_ckpt_dir>
