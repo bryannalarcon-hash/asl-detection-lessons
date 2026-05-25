@@ -23,7 +23,7 @@ DISK="${POD_DISK:-60}"
 CKPT="checkpoints/stage2_v4_classifier_popsign"
 
 N1=results/v3/net1_v3_1/best_export.pt
-N2=results/v3/net2/best.pt
+N2=results/v3/net2_v3_1/best.pt   # stronger detector; Net 3 self-orients (2-pass)
 N3=results/v3/net3/best.pt
 for f in "$N1" "$N2" "$N3"; do
     [ -s "$REPO_ROOT/$f" ] || { echo "[FATAL] missing local checkpoint: $f"; exit 3; }
@@ -50,7 +50,7 @@ echo "[3/6] validating GPU + torch"
     || { echo "[FATAL] GPU/torch sanity failed"; exit 6; }
 
 echo "[4/6] shipping code + checkpoints"
-"${SSH[@]}" 'mkdir -p /workspace/asl/logs /workspace/asl/results/v3/net1_v3_1 /workspace/asl/results/v3/net2 /workspace/asl/results/v3/net3'
+"${SSH[@]}" 'mkdir -p /workspace/asl/logs /workspace/asl/results/v3/net1_v3_1 /workspace/asl/results/v3/net2_v3_1 /workspace/asl/results/v3/net3'
 TAR="/tmp/asl_phasec_$$.tar.gz"
 tar --exclude='__pycache__' --exclude='*.pyc' --exclude='*.log' -czf "$TAR" -C "$REPO_ROOT" src configs scripts requirements.txt
 "${SCP[@]}" "$TAR" "root@$HOST:/workspace/asl_code.tar.gz"; rm -f "$TAR"

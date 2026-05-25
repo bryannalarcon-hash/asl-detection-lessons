@@ -20,7 +20,10 @@ mkdir -p logs work data/signs/popsign_kpt_cache
 # demonstrates the e2e pipeline (~2 hr / ~$2); raise later for accuracy.
 MAX_PER_SIGN="${MAX_PER_SIGN:-40}"
 NET1=results/v3/net1_v3_1/best_export.pt
-NET2=results/v3/net2/best.pt
+# net2_v3_1 is the stronger detector (AP 0.20 vs the new kpt net2's 0.016 on
+# COCO-WholeBody val). It has no keypoint head, so Net 3 self-orients via the
+# 2-pass crop (below) -- good detection AND oriented crops, no weak detector.
+NET2=results/v3/net2_v3_1/best.pt
 NET3=results/v3/net3/best.pt
 KPT_OUT=data/signs/popsign_kpt_cache
 BASE="https://signdata.cc.gatech.edu/data/popsign_v1_0/game/train"
@@ -75,7 +78,7 @@ for sign in "${SIGNS[@]}"; do
         --out "work/${sign}.jsonl" --max-per-sign "$MAX_PER_SIGN" 2>&1 | tee -a logs/phasec.log
     python3 -m src.stage2.data.extract_keypoints \
         --manifest "work/${sign}.jsonl" --net1 "$NET1" --net2 "$NET2" --net3 "$NET3" \
-        --out "$KPT_OUT" --max-frames 32 --no-two-pass --delete-after \
+        --out "$KPT_OUT" --max-frames 32 --delete-after \
         2>&1 | tee -a logs/extract.log
     rm -rf "work/${sign}" "work/${sign}.jsonl"
     ok=$((ok+1))
