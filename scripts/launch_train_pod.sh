@@ -85,24 +85,32 @@ ENVF="/tmp/remote_env_${ROLE}_$$"
 } > "$ENVF"
 "${SCP[@]}" "$ENVF" "root@$HOST:/workspace/asl/.remote_env"
 rm -f "$ENVF"
-# Detach with nohup+setsid (the runpod image has no tmux). The process keeps
-# running after this SSH connection closes; logs land in logs/remote_<role>.log.
-"${SSH[@]}" "cd /workspace/asl && chmod +x scripts/_remote_train.sh && \
+# Detach with setsid (no tmux on the image). Wrap in `timeout`: some images
+# keep the SSH channel open even with redirects + disown, hanging the client
+# indefinitely. setsid means the remote process survives the client being
+# killed by the timeout, so a timed-out launch ssh is still a successful start.
+timeout 60 "${SSH[@]}" "cd /workspace/asl && chmod +x scripts/_remote_train.sh && \
     setsid bash scripts/_remote_train.sh $ROLE >logs/remote_$ROLE.log 2>&1 </dev/null & \
-    disown; echo launched"
-sleep 5
-# Liveness via log output, NOT pgrep: pgrep -f would self-match the SSH shell
-# running pgrep (its arg string contains the script name) and always pass.
-"${SSH[@]}" "grep -q 'installing system tools' /workspace/asl/logs/remote_$ROLE.log 2>/dev/null" \
-    || { echo "[FATAL] remote training did not begin (no log output)"; exit 7; }
+    disown; echo launched" \
+    || echo "  (launch ssh closed via timeout; setsid process persists)"
 
 echo "[6/6] recording pod to .round_env"
+# Record + clear the destroy-trap BEFORE any verification, so a flaky verify
+# SSH can never wrongly tear down a pod that is already training.
 # .round_env line: POD <role> <pod_id> <host> <port> <remote_ckpt_dir>
 touch "$REPO_ROOT/.round_env"
 grep -v "^POD $ROLE " "$REPO_ROOT/.round_env" > "$REPO_ROOT/.round_env.tmp" 2>/dev/null || true
 mv "$REPO_ROOT/.round_env.tmp" "$REPO_ROOT/.round_env" 2>/dev/null || true
 echo "POD $ROLE $POD_ID $HOST $PORT $CKPT" >> "$REPO_ROOT/.round_env"
+trap - EXIT   # pod is recorded; never auto-destroy from here
 
-trap - EXIT   # success: leave the pod running
+# Best-effort liveness (log-based; never destroys — the cron catches real
+# failures). pgrep would self-match the SSH shell, so grep the log instead.
+sleep 6
+if timeout 30 "${SSH[@]}" "grep -q 'installing system tools' /workspace/asl/logs/remote_$ROLE.log 2>/dev/null"; then
+    echo "  remote training confirmed (log is writing)"
+else
+    echo "  [warn] could not confirm log yet; pod recorded, cron will monitor"
+fi
 echo "[done] $ROLE training launched on pod $POD_ID (ssh root@$HOST:$PORT)"
 echo "       monitor: bash scripts/round_health.sh   destroy: $PROV destroy $POD_ID"
