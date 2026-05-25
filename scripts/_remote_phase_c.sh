@@ -27,6 +27,10 @@ BATCHED="${BATCHED:-0}"
 # WORKERS>1 runs a thread pool over clips (cv2 decode is the bottleneck and
 # releases the GIL, so threads parallelize decode; models load once + shared).
 WORKERS="${WORKERS:-1}"
+# SIGN_CONCURRENCY>1 runs that many signs' full pipelines (download+untar+extract)
+# at once, overlapping each sign's network/disk I/O with others' compute. The
+# per-sign loop was the wall once per-clip extraction got fast.
+SIGN_CONCURRENCY="${SIGN_CONCURRENCY:-1}"
 # TRAIN_NET4=0 extracts keypoints only (top-up pods that merge later); =1 also
 # builds the Net 4 manifest and trains the classifier.
 TRAIN_NET4="${TRAIN_NET4:-1}"
@@ -62,42 +66,49 @@ for signs in d["categories"].values():
 print("\n".join(out))
 PY
 )
-echo "[phasec] ${#SIGNS[@]} signs to extract (cap ${MAX_PER_SIGN}/sign)"
+echo "[phasec] ${#SIGNS[@]} signs (cap ${MAX_PER_SIGN}/sign, offset ${OFFSET}, workers ${WORKERS}, sign-concurrency ${SIGN_CONCURRENCY})"
 
-ok=0; miss=0
-for sign in "${SIGNS[@]}"; do
-    url="${BASE}/${sign}.tar"
+# One sign's full pipeline: probe -> download(resume+retry) -> untar
+# (--no-same-owner: PopSign tars carry a foreign uid; chown would fail as root)
+# -> clip manifest (offset slice) -> threaded keypoint extract (--skip-existing
+# resumes) -> rm raw video. Runs in the background, N at a time, so each sign's
+# network/disk I/O overlaps with others' compute.
+do_sign() {
+    local sign="$1"
+    local url="${BASE}/${sign}.tar"
     if ! curl -sfI --max-time 30 "$url" >/dev/null 2>&1; then
-        echo "[phasec] MISS $sign (no tar at $url)"; miss=$((miss+1)); continue
+        echo "[phasec] MISS $sign (no tar at $url)"; return
     fi
     echo "[phasec] $(date -u) $sign : download"
-    rm -rf "work/${sign}"
-    tarf="work/${sign}.tar"
-    # Download to a file with resume (-C -) + retries: PopSign tars are multi-GB
-    # and a streamed "curl | tar" loses the whole sign on any mid-stream drop.
+    rm -rf "work/${sign}" "work/${sign}.tar"
+    local tarf="work/${sign}.tar"
     if ! curl -sf -C - --retry 6 --retry-delay 5 --retry-all-errors \
             --max-time 3600 -o "$tarf" "$url" 2>>logs/phasec.log; then
-        echo "[phasec] WARN $sign download failed after retries; skipping"; rm -f "$tarf"; continue
+        echo "[phasec] WARN $sign download failed; skipping"; rm -f "$tarf"; return
     fi
-    # --no-same-owner: PopSign tars carry the GT researcher's uid/gid; as root
-    # tar would try to chown to a nonexistent uid, fail, and exit nonzero even
-    # though the files extract fine. Without this the whole sign is skipped.
     if ! tar --no-same-owner -xf "$tarf" -C work/ 2>>logs/phasec.log; then
-        echo "[phasec] WARN $sign extract failed; skipping"; rm -rf "$tarf" "work/${sign}"; continue
+        echo "[phasec] WARN $sign untar failed; skipping"; rm -rf "$tarf" "work/${sign}"; return
     fi
     rm -f "$tarf"
     python3 scripts/build_clip_manifest.py --work-dir work --signs "$sign" \
-        --out "work/${sign}.jsonl" --max-per-sign "$MAX_PER_SIGN" --offset "$OFFSET" 2>&1 | tee -a logs/phasec.log
+        --out "work/${sign}.jsonl" --max-per-sign "$MAX_PER_SIGN" --offset "$OFFSET" >>logs/phasec.log 2>&1
     python3 -m src.stage2.data.extract_keypoints \
         --manifest "work/${sign}.jsonl" --net1 "$NET1" --net2 "$NET2" --net3 "$NET3" \
         --out "$KPT_OUT" --max-frames 32 --delete-after $BATCHED_FLAG --workers "$WORKERS" \
-        2>&1 | tee -a logs/extract.log
+        >>logs/extract.log 2>&1
     rm -rf "work/${sign}" "work/${sign}.jsonl"
-    ok=$((ok+1))
-    echo "[phasec] $sign done ($ok ok / $miss miss); npz=$(ls "$KPT_OUT" | wc -l); df: $(df -h /workspace | awk 'NR==2{print $4" free"}')"
-done
+    echo "[phasec] $sign done; npz=$(ls "$KPT_OUT" 2>/dev/null | wc -l); df: $(df -h /workspace | awk 'NR==2{print $4" free"}')"
+}
 
-echo "[phasec] extraction complete: $ok signs, $(ls "$KPT_OUT" | wc -l) npz files"
+running=0
+for sign in "${SIGNS[@]}"; do
+    do_sign "$sign" &
+    running=$((running+1))
+    if [ "$running" -ge "$SIGN_CONCURRENCY" ]; then wait -n 2>/dev/null || wait; running=$((running-1)); fi
+done
+wait
+
+echo "[phasec] extraction complete: $(ls "$KPT_OUT" | wc -l) npz files"
 touch .extract_done
 
 if [ "$TRAIN_NET4" != "1" ]; then
