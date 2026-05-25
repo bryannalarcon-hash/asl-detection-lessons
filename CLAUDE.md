@@ -4,9 +4,11 @@ This file is auto-loaded by Claude Code in every session for this project.
 It overrides the global `~/CLAUDE.md` where they conflict.
 
 For *current codebase state* (what's built, what works, gotchas), read
-the latest handoff in `docs/handoffs/` (currently `HANDOFF_NET3_V2.md`
-for ML training, `HANDOFF_FRONTEND.md` for the pilot app). This file is
-the **invariant doctrine** — how to work, not what's been done.
+`docs/handoffs/README.md` — it carries the current-state summary and points
+to the active handoffs (`HANDOFF_MEDIAPIPE_GAP.md` for the ML round,
+`HANDOFF_FRONTEND.md` for the pilot app); superseded handoffs are in
+`docs/handoffs/archive/`. This file is the **invariant doctrine** — how to
+work, not what's been done.
 
 ---
 
@@ -95,7 +97,7 @@ Before any non-localhost deploy of this project, set ALL of:
 
 ## Pointers (for current state, not doctrine)
 
-- `docs/handoffs/` — session handoffs (latest = `HANDOFF_NET3_V2.md`); frontend state in `HANDOFF_FRONTEND.md`
+- `docs/handoffs/` — session handoffs; start at `README.md` (current state + active handoffs); superseded ones in `archive/`. Frontend state in `HANDOFF_FRONTEND.md`
 - `GITLAB.md` — repo URL, token handling, push procedure, gitignore rules
 - `docs/principles.md` — pedagogy + UX principles (research synthesis)
 - `docs/ux-spec.md` — 23-route UX spec + state machine + dev scaffolding

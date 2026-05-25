@@ -1,35 +1,39 @@
 # Handoffs
 
-Session resume points, ordered newest-first. Each handoff describes the
-state at the time it was written; later handoffs supersede earlier ones
-on overlapping topics.
+Session resume points. Active handoffs live here; superseded ones are in
+`archive/`. Later handoffs supersede earlier ones on overlapping topics.
 
-## ML training track
+## Current state (2026-05-25)
 
-1. **`HANDOFF_MEDIAPIPE_GAP.md`** — CURRENT. Net 3 v2 landed (0.32 PCK@0.05);
-   MediaPipe gap analysis + greenlit action plan (regression Net 3, ROI
-   tracking, Net 2 keypoints, Net 4 per-hand norm, checkpoint hygiene, INT8).
-   Demo upgrades (box expansion, stable-box filter, one-euro smoothing).
-2. `net4_data_sourcing.md` — ≥500-clip/word PopSign-drawn ASL-1 vocabulary +
-   memory-safe acquisition plan (sourcing verified, nothing downloaded).
-3. `HANDOFF_NET3_V2.md` — Net 3 v2 retrain prep round.
-4. `HANDOFF_POST_TRAIN.md` — post-training state after Net 1 + Net 2 finished;
-   Net 3 v1 failed on disk-full.
-3. `HANDOFF_V3_1.md` — v3.1 round (Vast instance `37514594`, cron job, goal
-   state).
-4. `HANDOFF_OPTIMIZATION_ROUND.md` — optimization attempts (CUDA Graphs,
-   channels_last, etc.).
-5. `HANDOFF_STAGE1.md` — original Stage 1 keypoint detector handoff (v3
-   plan, dataset details, conventions).
+MediaPipe-gap retrain round in progress. Net 3 was rewritten heatmap →
+**direct coordinate regression** and trained (held-out FreiHAND
+**val_pck_05 = 0.45**, up from the old heatmap net's 0.32). The new
+keypoint-head Net 2 under-trained and regressed as a detector (AP 0.016 vs
+net2_v3_1's 0.20), so the pipeline uses **net2_v3_1 + Net 3 2-pass
+self-orientation** instead. Net 4 (PopSign, ~96 signs) is extracting +
+training toward the end-to-end pipeline. Full outcome in the auto-memory
+note `project_net_v3_regression_round.md`.
 
-## Frontend / pilot app track
+## Active
 
-- `HANDOFF_FRONTEND.md` — current state of the browser pilot (scaffold +
-  post-scaffold deltas: heatmap rewrite, sign-complete toast, resume
-  cursor, mode toggles, etc.).
+### ML training track
+- **`HANDOFF_MEDIAPIPE_GAP.md`** — the ranked MediaPipe-gap action plan
+  (regression Net 3, ROI tracking, Net 2 keypoints, Net 4 per-hand norm,
+  checkpoint hygiene, INT8). The doctrine for the current round.
+- **`net4_data_sourcing.md`** — the ~96-word PopSign-drawn ASL-1 vocabulary
+  + memory-safe per-sign download/extract plan (Net 4 data).
+
+### Frontend / pilot app track
+- **`HANDOFF_FRONTEND.md`** — browser pilot state (scaffold + deltas).
+
+## Archived (superseded)
+
+`archive/` holds earlier ML handoffs kept for history:
+`HANDOFF_NET3_V2` (pre-regression Net 3), `HANDOFF_POST_TRAIN`,
+`HANDOFF_V3_1`, `HANDOFF_OPTIMIZATION_ROUND`, `HANDOFF_STAGE1`.
 
 ## Not a session handoff
 
 `docs/ml-handoff.md` (sibling, not in this folder) is the CV black-box
-**interface contract** between the ML and frontend tracks. It's a
-permanent spec, not a session resume point.
+**interface contract** between the ML and frontend tracks — a permanent
+spec, not a session resume point.
