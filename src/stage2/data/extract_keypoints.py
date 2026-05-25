@@ -30,7 +30,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Iterator
 
@@ -512,6 +514,53 @@ def extract_one_clip(net1, net1_k, net1_kslice, net2, net2_meta, net3,
     return (np.stack(kpts_out), np.stack(vis_out), W_orig, H_orig)
 
 
+def process_one(entry: dict, *, extract_fn, models: tuple, out_dir: Path,
+                device: str, max_frames: int, two_pass: bool,
+                skip_existing: bool, delete_after: bool,
+                write_lock: threading.Lock) -> str:
+    """Handle one manifest entry end-to-end. Returns a status tag.
+
+    Status is one of {"skip", "miss", "fail", "done"}. Models are shared
+    (loaded once in main); each entry is owned by exactly one caller, so the
+    per-clip npz write + source delete are race-free apart from the npz write
+    itself, which is serialised under ``write_lock`` for safety. Thread-safe:
+    the extract fns build their own per-call tensors and only read the shared
+    models; torch inference releases the GIL.
+    """
+    net1, net1_k, net1_kslice, net2, net2_meta, net3, net3_head_type = models
+    clip_path = Path(entry["clip_path"])
+    gloss = entry["gloss"]
+    split = entry.get("split", "train")
+    out_path = out_dir / f"{clip_path.stem}.npz"
+    if skip_existing and out_path.exists():
+        return "skip"
+    if not clip_path.exists():
+        print(f"[miss] {clip_path}", flush=True)
+        return "miss"
+    result = extract_fn(net1, net1_k, net1_kslice, net2,
+                        net2_meta, net3, net3_head_type,
+                        clip_path, device,
+                        max_frames=max_frames,
+                        two_pass_fallback=two_pass)
+    if result is None:
+        print(f"[fail] {clip_path}", flush=True)
+        return "fail"
+    kpts, vis, W, H = result
+    with write_lock:
+        np.savez_compressed(out_path,
+                            keypoints=kpts.astype(np.float32),
+                            visibility=vis.astype(np.float32),
+                            width=W, height=H,
+                            gloss=gloss, split=split,
+                            clip_id=clip_path.stem)
+    if delete_after:
+        try:
+            clip_path.unlink()
+        except OSError:
+            pass
+    return "done"
+
+
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--manifest", required=True,
@@ -537,6 +586,13 @@ def main() -> None:
                         "(extract_one_clip_batched): one forward per network "
                         "per clip instead of one per frame. Output is "
                         "equivalent to the per-frame reference path.")
+    p.add_argument("--workers", type=int, default=1,
+                   help="Number of clip-processing threads (default 1 = "
+                        "serial). >1 runs a ThreadPoolExecutor over clips; "
+                        "cv2 video decode releases the GIL so decode "
+                        "parallelises. Models load ONCE and are shared across "
+                        "threads (do not use processes — they would reload "
+                        "the models per worker).")
     args = p.parse_args()
 
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
@@ -562,56 +618,53 @@ def main() -> None:
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    n_done = 0
-    n_skip = 0
-    n_fail = 0
-    t0 = time.time()
+    entries: list[dict] = []
     with open(args.manifest) as f:
         for line_no, line in enumerate(f, 1):
             if args.limit and line_no > args.limit:
                 break
-            e = json.loads(line)
-            clip_path = Path(e["clip_path"])
-            gloss = e["gloss"]
-            split = e.get("split", "train")
-            out_path = out_dir / f"{clip_path.stem}.npz"
-            if args.skip_existing and out_path.exists():
-                n_skip += 1
-                continue
-            if not clip_path.exists():
-                print(f"[miss] {clip_path}", flush=True)
-                n_fail += 1
-                continue
-            result = extract_fn(net1, net1_k, net1_kslice, net2,
-                                net2_meta, net3, net3_head_type,
-                                clip_path, device,
-                                max_frames=args.max_frames,
-                                two_pass_fallback=two_pass)
-            if result is None:
-                n_fail += 1
-                print(f"[fail] {clip_path}", flush=True)
-                continue
-            kpts, vis, W, H = result
-            np.savez_compressed(out_path,
-                                keypoints=kpts.astype(np.float32),
-                                visibility=vis.astype(np.float32),
-                                width=W, height=H,
-                                gloss=gloss, split=split,
-                                clip_id=clip_path.stem)
-            n_done += 1
-            if args.delete_after:
-                try:
-                    clip_path.unlink()
-                except OSError:
-                    pass
-            if n_done % 50 == 0:
+            entries.append(json.loads(line))
+
+    models = (net1, net1_k, net1_kslice, net2, net2_meta, net3,
+              net3_head_type)
+    write_lock = threading.Lock()
+    counts = {"done": 0, "skip": 0, "miss": 0, "fail": 0}
+    counts_lock = threading.Lock()
+    t0 = time.time()
+    workers = max(1, int(args.workers))
+    print(f"[init] workers={workers}", flush=True)
+
+    def work(entry: dict) -> str:
+        status = process_one(
+            entry, extract_fn=extract_fn, models=models, out_dir=out_dir,
+            device=device, max_frames=args.max_frames, two_pass=two_pass,
+            skip_existing=args.skip_existing, delete_after=args.delete_after,
+            write_lock=write_lock)
+        with counts_lock:
+            counts[status] += 1
+            n_done = counts["done"]
+            if status == "done" and n_done % 50 == 0:
                 rate = n_done / max(time.time() - t0, 1e-6)
-                print(f"[prog] done={n_done} skip={n_skip} fail={n_fail} "
+                print(f"[prog] done={n_done} skip={counts['skip']} "
+                      f"fail={counts['fail'] + counts['miss']} "
                       f"rate={rate:.1f}/s elapsed={time.time()-t0:.0f}s",
                       flush=True)
+        return status
+
+    if workers == 1:
+        for entry in entries:
+            work(entry)
+    else:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = [pool.submit(work, entry) for entry in entries]
+            for fut in as_completed(futures):
+                fut.result()
+
+    n_done = counts["done"]
+    n_fail = counts["fail"] + counts["miss"]
     rate = n_done / max(time.time() - t0, 1e-6)
-    print(f"[done] {n_done} extracted, {n_skip} skipped, {n_fail} failed "
-          f"({rate:.2f}/s)", flush=True)
+    print(f"[done] {n_done} extracted, {counts['skip']} skipped, {n_fail} "
+          f"failed ({rate:.2f}/s)", flush=True)
 
 
 if __name__ == "__main__":

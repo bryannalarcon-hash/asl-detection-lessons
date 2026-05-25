@@ -24,6 +24,9 @@ MAX_PER_SIGN="${MAX_PER_SIGN:-40}"
 OFFSET="${OFFSET:-0}"
 # BATCHED=1 uses the GPU-batched extractor (one forward per net per clip).
 BATCHED="${BATCHED:-0}"
+# WORKERS>1 runs a thread pool over clips (cv2 decode is the bottleneck and
+# releases the GIL, so threads parallelize decode; models load once + shared).
+WORKERS="${WORKERS:-1}"
 # TRAIN_NET4=0 extracts keypoints only (top-up pods that merge later); =1 also
 # builds the Net 4 manifest and trains the classifier.
 TRAIN_NET4="${TRAIN_NET4:-1}"
@@ -87,7 +90,7 @@ for sign in "${SIGNS[@]}"; do
         --out "work/${sign}.jsonl" --max-per-sign "$MAX_PER_SIGN" --offset "$OFFSET" 2>&1 | tee -a logs/phasec.log
     python3 -m src.stage2.data.extract_keypoints \
         --manifest "work/${sign}.jsonl" --net1 "$NET1" --net2 "$NET2" --net3 "$NET3" \
-        --out "$KPT_OUT" --max-frames 32 --delete-after $BATCHED_FLAG \
+        --out "$KPT_OUT" --max-frames 32 --delete-after $BATCHED_FLAG --workers "$WORKERS" \
         2>&1 | tee -a logs/extract.log
     rm -rf "work/${sign}" "work/${sign}.jsonl"
     ok=$((ok+1))
