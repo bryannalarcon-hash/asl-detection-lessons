@@ -81,3 +81,7 @@ ruvector.db
 
 # local-only lesson reference clips (large; served by Vite in dev, not committed)
 frontend/public/videos/lessons/
+
+# exported ONNX model assets (large, regenerable from checkpoints)
+frontend/public/models/*.onnx
+tools/onnx_export/*.onnx
