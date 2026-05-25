@@ -26,6 +26,7 @@ CKPT="checkpoints/stage2_v4_classifier_popsign"
 # BATCHED, TRAIN_NET4) are passed through to the remote via a shipped .remote_env.
 ROLE="${ROLE:-phasec}"
 LOG="logs/remote_${ROLE}.log"
+GPU="${RUNPOD_GPU:-NVIDIA GeForce RTX 5090}"
 
 N1=results/v3/net1_v3_1/best_export.pt
 N2=results/v3/net2_v3_1/best.pt   # stronger detector; Net 3 self-orients (2-pass)
@@ -35,7 +36,7 @@ for f in "$N1" "$N2" "$N3"; do
 done
 echo "[0/6] checkpoints present: net1=$(stat -c%s "$N1") net2=$(stat -c%s "$N2") net3=$(stat -c%s "$N3")"
 
-deploy() { $PROV deploy --name "asl-$ROLE" --disk "$DISK" --image "$IMAGE" $1 2>/tmp/dep_$ROLE.err; }
+deploy() { $PROV deploy --name "asl-$ROLE" --gpu "$GPU" --disk "$DISK" --image "$IMAGE" $1 2>/tmp/dep_$ROLE.err; }
 echo "[1/6] provisioning $ROLE pod (disk=${DISK}GB)"
 POD_ID=""
 for try in 1 2 3; do POD_ID=$(deploy "" || true); [ -n "$POD_ID" ] && { echo "  community pod $POD_ID"; break; }; sleep 8; done
