@@ -16,6 +16,7 @@
     "Social": ["yes", "no", "please", "thankyou", "who"]
   },
   "popsign_tar_aliases": {
+    "bathroom": "potty",
     "city": "downtown",
     "school": "playgroundschool",
     "angry": "mad",
