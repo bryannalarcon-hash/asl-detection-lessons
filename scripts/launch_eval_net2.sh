@@ -17,10 +17,19 @@ for f in results/v3/net2/best.pt results/v3/net2_v3_1/best.pt; do
     [ -s "$f" ] || { echo "[FATAL] missing $f"; exit 3; }
 done
 echo "[1/5] provisioning eval pod (disk=${DISK}GB)"
-deploy() { $PROV deploy --name asl-evalnet2 --disk "$DISK" --image "$IMAGE" $1 2>/tmp/dep_eval.err; }
+# The AP eval is a light job (small net, ~800 imgs) -- no need for a 5090.
+# RUNPOD_GPU lets us target whatever has capacity (4090 etc.).
+GPU="${RUNPOD_GPU:-NVIDIA GeForce RTX 5090}"
+deploy() { $PROV deploy --name asl-evalnet2 --gpu "$GPU" --disk "$DISK" --image "$IMAGE" $1 2>/tmp/dep_eval.err; }
 POD_ID=""
-for try in 1 2 3; do POD_ID=$(deploy "" || true); [ -n "$POD_ID" ] && break; sleep 8; done
-[ -n "$POD_ID" ] || POD_ID=$(deploy "--secure" || true)
+# Community pods often expose no public TCP SSH (proxy-only) which our
+# direct-SSH provisioner can't use; FORCE_SECURE=1 goes straight to secure.
+if [ "${FORCE_SECURE:-0}" = "1" ]; then
+    for try in 1 2 3; do POD_ID=$(deploy "--secure" || true); [ -n "$POD_ID" ] && break; sleep 8; done
+else
+    for try in 1 2 3; do POD_ID=$(deploy "" || true); [ -n "$POD_ID" ] && break; sleep 8; done
+    [ -n "$POD_ID" ] || POD_ID=$(deploy "--secure" || true)
+fi
 [ -n "$POD_ID" ] || { echo "[FATAL] deploy failed: $(cat /tmp/dep_eval.err)"; exit 4; }
 echo "  pod $POD_ID"
 trap 'echo "[cleanup] destroying $POD_ID"; '"$PROV"' destroy "'"$POD_ID"'" || true' EXIT
