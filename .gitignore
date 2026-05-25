@@ -78,3 +78,6 @@ ruvector.db
 .round_env
 .remote_env
 .eval_pod
+
+# local-only lesson reference clips (large; served by Vite in dev, not committed)
+frontend/public/videos/lessons/

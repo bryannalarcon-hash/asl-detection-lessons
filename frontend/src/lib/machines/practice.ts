@@ -3,20 +3,25 @@
 import { setup, assign } from 'xstate';
 import type { DrillType } from '@/cv/types';
 
+export interface PracticeDrill {
+  drillType: DrillType;
+  target: string;
+  /**
+   * Per-stage rep count, overlaid from the dev Lesson Config. When set it wins
+   * over the context-level `repsPerDrill` default. Drives `hasMoreReps`.
+   */
+  reps?: number;
+  /** Per-stage reference-clip sub-range in seconds (dev Lesson Config overlay). */
+  segment?: { startSec: number; endSec: number };
+}
+
 export interface PracticeSign {
   id: string;
   slug: string;
   englishGloss: string;
-  drills: { drillType: DrillType; target: string }[];
-  /**
-   * Per-sign rep count, overlaid from the dev Lesson Config. When set it wins
-   * over the context-level `repsPerDrill` default. Drives `hasMoreReps`.
-   */
-  reps?: number;
+  drills: PracticeDrill[];
   /** Reference-clip source for this sign (dev Lesson Config overlay). */
   videoSrc?: string;
-  /** Reference-clip sub-range in seconds (dev Lesson Config overlay). */
-  segment?: { startSec: number; endSec: number };
 }
 
 export interface PracticeContext {
@@ -111,7 +116,14 @@ export const practiceMachine = setup({
     const signIndex = clampIdx(input.initialSignIndex, 0, input.signs.length - 1);
     const drillsInSign = input.signs[signIndex]?.drills.length ?? 1;
     const drillIndex = clampIdx(input.initialDrillIndex, 0, drillsInSign - 1);
-    const repIndex = clampIdx(input.initialRepIndex, 0, repsPerDrill - 1);
+    // Clamp the restored rep cursor against the initial stage's own rep count
+    // (per-stage overlay may differ from the default), not the bare default.
+    const initialStageReps = input.signs[signIndex]?.drills[drillIndex]?.reps;
+    const repCeil =
+      typeof initialStageReps === 'number' && initialStageReps > 0
+        ? Math.trunc(initialStageReps)
+        : repsPerDrill;
+    const repIndex = clampIdx(input.initialRepIndex, 0, Math.max(1, repCeil) - 1);
     return {
       signs: input.signs,
       signIndex,
@@ -210,16 +222,16 @@ function clampIdx(v: number | undefined, lo: number, hi: number): number {
 // === Selectors ===
 
 /**
- * Reps the current sign requires: the per-sign overlay value when present,
+ * Reps the current stage requires: the per-stage overlay value when present,
  * else the context-level `repsPerDrill` default. Kept >=1 so a 0/NaN overlay
  * can't strand the machine.
  */
 export function effectiveReps(ctx: PracticeContext): number {
-  const sign = ctx.signs[ctx.signIndex];
-  const perSign = sign?.reps;
+  const drill = ctx.signs[ctx.signIndex]?.drills[ctx.drillIndex];
+  const perStage = drill?.reps;
   const reps =
-    typeof perSign === 'number' && Number.isFinite(perSign) && perSign > 0
-      ? Math.trunc(perSign)
+    typeof perStage === 'number' && Number.isFinite(perStage) && perStage > 0
+      ? Math.trunc(perStage)
       : ctx.repsPerDrill;
   return Math.max(1, reps);
 }
@@ -228,9 +240,7 @@ export function selectCurrentSign(ctx: PracticeContext): PracticeSign | null {
   return ctx.signs[ctx.signIndex] ?? null;
 }
 
-export function selectCurrentDrill(
-  ctx: PracticeContext
-): { drillType: DrillType; target: string } | null {
+export function selectCurrentDrill(ctx: PracticeContext): PracticeDrill | null {
   const sign = selectCurrentSign(ctx);
   if (!sign) return null;
   return sign.drills[ctx.drillIndex] ?? null;

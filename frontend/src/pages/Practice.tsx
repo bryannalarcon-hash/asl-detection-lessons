@@ -14,7 +14,11 @@ import {
   effectiveReps,
   type PracticeSign,
 } from '@/lib/machines/practice';
-import { readLessonConfig, type LessonConfig } from '@/lib/lesson-config';
+import {
+  readLessonConfig,
+  isAutoSegment,
+  type LessonConfig,
+} from '@/lib/lesson-config';
 import { FALLBACK_SIGNS } from '@/lib/fallback-lesson';
 import { CameraPanel } from '@/components/practice/CameraPanel';
 import { ReferenceVideo } from '@/components/practice/ReferenceVideo';
@@ -50,11 +54,11 @@ function buildSignsFromBackend(
 }
 
 /**
- * Apply a dev Lesson Config overlay onto the default signs. Each overlay drill
- * names a sign (by slug) plus reps + video segment; the overlay's drill list
- * defines the lesson's drill count and order. Unknown slugs are dropped. When
- * a drill names a sign not in the defaults but resolvable, we still surface it
- * with synthetic micro-drills so dev edits aren't silently swallowed.
+ * Apply a dev Lesson Config overlay onto the default signs. The overlay's sign
+ * list defines the lesson's sign count and order; each entry carries per-stage
+ * reps + clip trim. We overlay onto each sign's existing drills by matching
+ * stage (drillType). Unknown slugs are dropped. An unset trim ({0,0}) is left
+ * off so the reference video falls back to its natural segment.
  */
 function applyLessonConfig(
   defaults: PracticeSign[],
@@ -62,14 +66,21 @@ function applyLessonConfig(
 ): PracticeSign[] {
   const bySlug = new Map(defaults.map((s) => [s.slug, s]));
   const out: PracticeSign[] = [];
-  for (const drill of config.drills) {
-    const base = bySlug.get(drill.sign);
+  for (const sc of config.signs) {
+    const base = bySlug.get(sc.sign);
     if (!base) continue;
     out.push({
       ...base,
-      reps: drill.reps,
-      videoSrc: drill.videoSrc,
-      segment: drill.segment,
+      videoSrc: sc.videoSrc,
+      drills: base.drills.map((d) => {
+        const stage = sc.stages[d.drillType];
+        if (!stage) return d;
+        return {
+          ...d,
+          reps: stage.reps,
+          segment: isAutoSegment(stage.segment) ? undefined : stage.segment,
+        };
+      }),
     });
   }
   return out.length > 0 ? out : defaults;
@@ -344,7 +355,7 @@ export default function PracticePage() {
               drillType={currentDrill?.drillType}
               paused={paused}
               videoSrc={currentSign.videoSrc}
-              segmentOverride={currentSign.segment}
+              segmentOverride={currentDrill?.segment}
             />
           )}
           {!showCamera && !showReference && currentSign && (

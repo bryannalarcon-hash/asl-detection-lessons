@@ -10,7 +10,7 @@ import { signInViaDevBypass } from './_helpers';
  *
  *   1. the `[Dev: Lesson Config]` entry link is visible on a lesson intro,
  *   2. the dev route `/dev/lesson-config` renders the editor page,
- *   3. the editor exposes the drill-count + per-drill controls.
+ *   3. the editor exposes the sign-count + per-sign/per-stage controls.
  *
  * The OFF-case (`VITE_DEV_TOOLS=0` hides the link, drops the route, and DCE
  * removes the page from the bundle) is covered by the unit spec
@@ -29,7 +29,7 @@ test.describe('dev lesson-config gating (default ON)', () => {
     await expect(link).toHaveAttribute('data-dev-override', 'true');
   });
 
-  test('the editor route renders with drill + reps + segment controls', async ({ page }) => {
+  test('the editor route renders sign + per-stage trim/reps controls', async ({ page }) => {
     await signInViaDevBypass(page);
     await page.goto('/dev/lesson-config');
 
@@ -37,33 +37,35 @@ test.describe('dev lesson-config gating (default ON)', () => {
     await expect(root).toBeVisible();
     await expect(root).toHaveAttribute('data-dev-override', 'true');
 
-    // Core controls exist (drill count, plus per-drill sign/reps/segment once a
-    // lesson is loaded — there is always at least one drill seeded).
-    await expect(page.locator('[data-testid="dev-lesson-config-drill-count"]')).toBeVisible();
+    // Core controls exist (sign count, plus per-sign select + video preview and
+    // per-stage trim/reps once a lesson is loaded — at least one sign is seeded).
+    await expect(page.locator('[data-testid="dev-lesson-config-sign-count"]')).toBeVisible();
+    await expect(page.locator('[data-testid="dev-sign-config"]').first()).toBeVisible();
+    await expect(page.locator('[data-testid="dev-sign-select"]').first()).toBeVisible();
+    await expect(page.locator('[data-testid="dev-sign-video"]').first()).toBeVisible();
+    // Handshape stage controls (start/end/reps) + preview.
     await expect(
-      page.locator('[data-testid="dev-lesson-config-drill"]').first()
+      page.locator('[data-testid="dev-stage-start-handshape"]').first()
     ).toBeVisible();
     await expect(
-      page.locator('[data-testid="dev-lesson-config-reps"]').first()
+      page.locator('[data-testid="dev-stage-reps-handshape"]').first()
     ).toBeVisible();
     await expect(
-      page.locator('[data-testid="dev-lesson-config-start"]').first()
-    ).toBeVisible();
-    await expect(
-      page.locator('[data-testid="dev-lesson-config-end"]').first()
+      page.locator('[data-testid="dev-stage-preview-handshape"]').first()
     ).toBeVisible();
     await expect(page.locator('[data-testid="dev-lesson-config-save"]')).toBeVisible();
   });
 
-  test('saving a reps override persists and drives the practice rep counter', async ({
+  test('saving a stage reps override persists and drives the practice rep counter', async ({
     page,
   }) => {
     await signInViaDevBypass(page);
     await page.goto('/dev/lesson-config');
     await expect(page.locator('[data-testid="page-dev-lesson-config"]')).toBeVisible();
 
-    // Set the first drill's reps to 5 and save.
-    const reps = page.locator('[data-testid="dev-lesson-config-reps"]').first();
+    // Set the first sign's handshape-stage reps to 5 and save. Practice opens on
+    // the handshape stage, so the rep counter denominator should become 5.
+    const reps = page.locator('[data-testid="dev-stage-reps-handshape"]').first();
     await reps.fill('5');
     await page.locator('[data-testid="dev-lesson-config-save"]').click();
     await expect(page.locator('[data-testid="dev-lesson-config-saved"]')).toBeVisible();

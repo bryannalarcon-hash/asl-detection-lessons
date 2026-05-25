@@ -77,29 +77,33 @@ export function ReferenceVideo({
     setSrc(videoSrc || MOCK_REFERENCE_VIDEO_URL);
   }, [videoSrc]);
 
+  // A present override (Practice maps an unset {0,0} trim to undefined) wins
+  // over the fraction-based drill segment. A start-only trim (end <= start)
+  // means "from start to the end of the clip" — matching the editor's preview.
   const useOverride =
     !!segmentOverride &&
-    segmentOverride.endSec > segmentOverride.startSec &&
-    segmentOverride.endSec > 0;
+    (segmentOverride.startSec > 0 || segmentOverride.endSec > 0);
 
   const segment = segmentForDrill(drillType);
-  // Override wins (absolute seconds, clamped to clip duration); else fall back
-  // to the fraction-based drill segment.
   const segStart = useOverride
     ? clamp(segmentOverride.startSec, 0, duration || segmentOverride.startSec)
     : duration * segment.start;
-  const segEnd = useOverride
-    ? clamp(segmentOverride.endSec, segStart, duration || segmentOverride.endSec)
-    : duration * segment.end;
+  let segEnd = duration * segment.end;
+  if (useOverride) {
+    segEnd =
+      segmentOverride.endSec > segmentOverride.startSec
+        ? clamp(segmentOverride.endSec, segStart, duration || segmentOverride.endSec)
+        : duration || segStart;
+  }
 
-  // Reset to segment start when drill changes
+  // Reset to segment start when the stage (drill) or its trim changes.
   useEffect(() => {
     const v = videoRef.current;
     if (!v || duration === 0) return;
     v.currentTime = segStart;
     v.play().catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drillType, duration]);
+  }, [drillType, duration, segStart, segEnd]);
 
   useEffect(() => {
     if (videoRef.current) videoRef.current.playbackRate = slowMo ? 0.5 : 1;

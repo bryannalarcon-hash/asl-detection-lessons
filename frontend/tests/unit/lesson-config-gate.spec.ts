@@ -6,8 +6,7 @@ import {
   writeLessonConfig,
   clearLessonConfig,
   configFromSigns,
-  defaultDrillForSign,
-  videoSrcForSign,
+  defaultSignConfig,
   type LessonConfig,
 } from '../../src/lib/lesson-config';
 
@@ -35,15 +34,18 @@ describe('lesson-config persistence', () => {
     window.localStorage.clear();
   });
 
-  it('round-trips a config keyed by slug', () => {
+  it('round-trips a per-stage config keyed by slug', () => {
     const cfg: LessonConfig = {
       slug: 'lesson-1',
-      drills: [
+      signs: [
         {
           sign: 'hello',
-          videoSrc: videoSrcForSign('hello'),
-          segment: { startSec: 1.5, endSec: 4 },
-          reps: 5,
+          videoSrc: '/videos/lessons/hello.mp4',
+          stages: {
+            handshape: { segment: { startSec: 0, endSec: 1.2 }, reps: 5 },
+            movement: { segment: { startSec: 1.2, endSec: 2.5 }, reps: 2 },
+            sign: { segment: { startSec: 0, endSec: 0 }, reps: 3 },
+          },
         },
       ],
     };
@@ -53,15 +55,15 @@ describe('lesson-config persistence', () => {
 
   it('returns null for an absent or empty config', () => {
     expect(readLessonConfig('nope')).toBeNull();
-    writeLessonConfig({ slug: 'lesson-2', drills: [] });
-    // Empty drill list is treated as "no overlay".
+    writeLessonConfig({ slug: 'lesson-2', signs: [] });
+    // Empty sign list is treated as "no overlay".
     expect(readLessonConfig('lesson-2')).toBeNull();
   });
 
-  it('drops malformed drills and falls back to null when none survive', () => {
+  it('drops malformed signs and falls back to null when none survive', () => {
     window.localStorage.setItem(
-      'asl-pilot.lessonConfig.v1.lesson-3',
-      JSON.stringify({ slug: 'lesson-3', drills: [{ sign: 'x' }] })
+      'asl-pilot.lessonConfig.v2.lesson-3',
+      JSON.stringify({ slug: 'lesson-3', signs: [{ sign: 'x' }] })
     );
     expect(readLessonConfig('lesson-3')).toBeNull();
   });
@@ -69,7 +71,7 @@ describe('lesson-config persistence', () => {
   it('clears a config', () => {
     writeLessonConfig({
       slug: 'lesson-4',
-      drills: [defaultDrillForSign('hello')],
+      signs: [defaultSignConfig('hello')],
     });
     clearLessonConfig('lesson-4');
     expect(readLessonConfig('lesson-4')).toBeNull();
@@ -77,9 +79,9 @@ describe('lesson-config persistence', () => {
 
   it('seeds defaults from a lesson signs list', () => {
     const cfg = configFromSigns('lesson-5', [{ slug: 'a' }, { slug: 'b' }]);
-    expect(cfg.drills).toHaveLength(2);
-    expect(cfg.drills[0]).toEqual(defaultDrillForSign('a'));
-    expect(cfg.drills[0].reps).toBe(3);
+    expect(cfg.signs).toHaveLength(2);
+    expect(cfg.signs[0]).toEqual(defaultSignConfig('a'));
+    expect(cfg.signs[0].stages.handshape.reps).toBe(3);
   });
 });
 
