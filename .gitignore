@@ -85,3 +85,8 @@ frontend/public/videos/lessons/
 # exported ONNX model assets (large, regenerable from checkpoints)
 frontend/public/models/*.onnx
 tools/onnx_export/*.onnx
+
+# large per-net parity fixtures (regenerable via tools/onnx_export/dump_reference.py)
+frontend/tests/cv/fixtures/net1_io.json
+frontend/tests/cv/fixtures/net2_io.json
+frontend/tests/cv/fixtures/net3_io.json
