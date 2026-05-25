@@ -47,13 +47,20 @@ class LandmarkTrainDataset(Dataset):
                  jitter_rot: float = 10.0,
                  phase2_bbox_cache: str | Path | None = None,
                  phase2_mix_prob: float = 0.5,
-                 rhd_dataset: RHDDataset | None = None):
+                 rhd_dataset: RHDDataset | None = None,
+                 canonicalize_rotation: bool = False):
         super().__init__()
         self.crop_size = crop_size
         self.padding_frac = padding_frac
         self.jitter_shift = jitter_shift
         self.jitter_scale = jitter_scale
         self.jitter_rot = jitter_rot
+        # When set, the crop is rotated so the wrist(0)→middle-MCP(9) vector
+        # points UP (canonical pose) before any jitter. Used by the
+        # regression trainer; the heatmap path leaves this False so its
+        # behavior is untouched. Mild ±jitter rotation is then applied by the
+        # trainer's GPUAugmentation (config augment.rotate_deg), NOT here.
+        self.canonicalize_rotation = bool(canonicalize_rotation)
         self.items: list[tuple[str, int, str]] = []
         for i in range(len(freihand)):
             self.items.append(("freihand", i, "right"))
@@ -110,7 +117,22 @@ class LandmarkTrainDataset(Dataset):
             box = jitter_bbox(box, shift_frac=self.jitter_shift,
                               scale_frac=self.jitter_scale, rng=rng)
 
-        rot_deg = float(rng.uniform(-self.jitter_rot, self.jitter_rot))
+        if self.canonicalize_rotation:
+            # Rotate the crop so the wrist(0)→middle-MCP(9) vector points UP.
+            # crop_hand rotates points by +rot_deg; a vector at angle phi ends
+            # up at phi + rot_deg. Target "up" is -90 deg (negative image-y),
+            # so rot_deg = -90 - phi. Mild jitter is added by GPUAugmentation.
+            wrist = coords[0]
+            mid_mcp = coords[9]
+            if visible[0] > 0 and visible[9] > 0:
+                vx = float(mid_mcp[0] - wrist[0])
+                vy = float(mid_mcp[1] - wrist[1])
+                phi = np.degrees(np.arctan2(vy, vx))
+                rot_deg = -90.0 - phi
+            else:
+                rot_deg = 0.0
+        else:
+            rot_deg = float(rng.uniform(-self.jitter_rot, self.jitter_rot))
 
         img = cv2.imread(sample["image_path"])
         if img is None:

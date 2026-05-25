@@ -136,11 +136,17 @@ def build_freihand_val_loader(cfg: dict, crop_size: int):
     if len(fh_val) == 0:
         return None, 0
     from src.stage1.data.landmark_dataset import LandmarkTrainDataset
+    # The val crops MUST use the same orientation contract as training, or
+    # the regression model (trained on wrist->MCP-up canonical crops) is
+    # scored on a distribution it never saw, deflating val_pck and corrupting
+    # best-checkpoint selection. Defaults False so the heatmap path is
+    # unchanged (its config has no canonicalize_rotation key).
     val_ds = LandmarkTrainDataset(
         fh_val, None, crop_size=crop_size,
         padding_frac=deep_get(cfg, "data.padding_frac", 0.5),
         jitter_shift=0.0, jitter_scale=0.0, jitter_rot=0.0,
         phase2_bbox_cache=None, phase2_mix_prob=0.0,
+        canonicalize_rotation=deep_get(cfg, "data.canonicalize_rotation", False),
     )
     cap = int(deep_get(cfg, "eval.max_val_samples", 2048))
     if cap and len(val_ds) > cap:

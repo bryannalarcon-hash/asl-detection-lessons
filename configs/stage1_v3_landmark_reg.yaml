@@ -1,0 +1,109 @@
+run_name: stage1_v3_landmark_reg
+
+data:
+  freihand_root: data/FreiHAND_pub_v2
+  interhand_root: data/interhand
+  rhd_root: data/RHD_published_v2
+  crop_size: 224
+  # heatmap_size / heatmap_sigma are unused by the regression head; kept so
+  # shared helpers that read them do not KeyError.
+  heatmap_size: 56
+  heatmap_sigma: 1.5
+  padding_frac: 0.5
+  jitter_shift: 0.10
+  jitter_scale: 0.30
+  # jitter_rot is IGNORED when canonicalize_rotation is true — the crop is
+  # rotated to canonical (wrist→middle-MCP points up) and mild rotation jitter
+  # is applied by GPUAugmentation (augment.rotate_deg below).
+  jitter_rot: 30.0
+  phase2_bbox_cache: null
+  phase2_mix_prob: 0.0
+
+  # Rotation canonicalization REPLACES v2's broken ±180 full-rotation aug.
+  canonicalize_rotation: true
+
+  target_mix:
+    freihand: 0.60
+    interhand_single: 0.30
+    rhd: 0.10
+
+  interhand_single_only: true
+  freihand_val_frac: 0.05
+  freihand_val_seed: 42
+
+model:
+  head_type: regression
+  num_keypoints: 21
+  # z and presence have no ground-truth plumbed from the dataset, so their
+  # loss weights are 0 (below). Disabling the heads avoids spending the tight
+  # param budget on untrained outputs. Re-enable together with a non-zero
+  # z_weight / presence_weight once targets are wired through.
+  with_z: false
+  with_presence: false
+
+loss:
+  # smooth_l1 (default) or wing. beta is in normalized [0,1] coord units;
+  # 0.04 ≈ 9 px at crop_size 224.
+  loss_type: smooth_l1
+  beta: 0.04
+  wing_omega: 0.1
+  wing_epsilon: 0.02
+  # z is UNSUPERVISED by default (dataset does not plumb per-sample z).
+  # Leave at 0.0 unless z ground-truth is wired through.
+  z_weight: 0.0
+  # Presence is emitted by the model but has no per-sample target plumbed
+  # from the dataset yet; keep at 0.0 until a presence target exists.
+  presence_weight: 0.0
+  # Fingertips (4, 8, 12, 16, 20) weighted higher; wrist (0) lowest.
+  keypoint_weights: [
+    0.5,                       # 0  wrist
+    1.0, 1.0, 1.0, 1.5,         # 1-4   thumb (CMC, MCP, IP, tip)
+    1.0, 1.0, 1.0, 1.5,         # 5-8   index
+    1.0, 1.0, 1.0, 1.5,         # 9-12  middle
+    1.0, 1.0, 1.0, 1.5,         # 13-16 ring
+    1.0, 1.0, 1.0, 1.5,         # 17-20 pinky
+  ]
+
+# GPU augmentation override. rotate_deg is now MILD (±15) because the crop is
+# already canonicalized upright by the dataset — this is the jitter on top.
+augment:
+  rotate_deg: 15.0
+  scale_range: [0.6, 1.4]
+  shift_frac: 0.08
+  hflip_p: 0.0
+  brightness: 0.4
+  contrast: 0.4
+  saturation: 0.3
+  hue: 0.1
+  blur_p: 0.5
+  noise_p: 0.2
+
+train:
+  batch_size: 256
+  num_workers: 16
+  epochs: 150
+  samples_per_epoch: 250000
+  lr: 1.0e-3
+  lr_min: 1.0e-5
+  warmup_epochs: 1
+  weight_decay: 1.0e-4
+  grad_clip: 1.0
+  ema_decay: 0.9998
+  mixed_precision: true
+  use_bf16: true
+  early_stop_patience: 999
+  early_stop_min_delta: 0.001
+  log_every: 50
+  val_every: 1
+  checkpoint_dir: checkpoints/stage1_v3_landmark_reg
+  seed: 42
+
+  s3_bucket: ""
+  s3_prefix: net3/checkpoints_reg
+  s3_sync_every: 10
+
+eval:
+  pck_threshold_fracs: [0.05, 0.10, 0.20]
+  pck_threshold_frac: 0.05
+  max_val_samples: 2048
+  val_batch_size: 256
