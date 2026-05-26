@@ -51,7 +51,7 @@ test-results/
 coverage/
 
 # Phase reports (scaffold-time artifacts)
-.scaffold-phase*-report.md
+.scaffold-*-report.md
 
 # Local-only generated artifacts (per GITLAB.md "must stay local")
 screenshots/
