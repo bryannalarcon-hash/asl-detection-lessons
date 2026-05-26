@@ -159,6 +159,20 @@ export function ReferenceVideo({
     }
   };
 
+  // Whole-sign clips reach the native end before onTimeUpdate can loop them
+  // (segEnd === duration), so the segment-loop in handleTimeUpdate never fires.
+  // Catch 'ended' explicitly: auto-loop back to the segment start, else pause.
+  const handleEnded = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (autoLoop) {
+      v.currentTime = segStart;
+      v.play().catch(() => undefined);
+    } else {
+      setPaused(true);
+    }
+  };
+
   const handleError = () => {
     if (src !== MOCK_REFERENCE_VIDEO_URL) setSrc(MOCK_REFERENCE_VIDEO_URL);
   };
@@ -186,6 +200,7 @@ export function ReferenceVideo({
         onError={handleError}
         onLoadedMetadata={handleLoadedMetadata}
         onTimeUpdate={handleTimeUpdate}
+        onEnded={handleEnded}
         onPlay={() => setPaused(false)}
         onPause={() => setPaused(true)}
         data-testid="reference-video"

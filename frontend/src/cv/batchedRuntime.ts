@@ -58,7 +58,10 @@ export interface InitResult {
 }
 
 const MODEL_VERSION = 'v3-onnx-webgpu-batched' as const;
-const ORT_VERSION = '1.23.0';
+// MUST match the installed onnxruntime-web version exactly — the JS loader
+// fetches its .wasm/.jsep binaries from this CDN dir, and a version skew fails
+// session creation (which silently disabled the in-app CV / the Record button).
+const ORT_VERSION = '1.26.0';
 const DEFAULT_WASM_CDN =
   `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VERSION}/dist/`;
 
