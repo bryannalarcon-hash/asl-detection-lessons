@@ -42,13 +42,16 @@ export function CvReadout({ verdict, backend, ready, notReady, target }: CvReado
   const handsFrac = verdict
     ? verdict.handsFrames / Math.max(1, verdict.framesProcessed)
     : 0;
+  const inTop5 = verdict ? verdict.topK.some((e) => e.gloss === target) : false;
   const rank = !verdict
     ? '—'
     : verdict.isTop1
       ? 'top-1'
       : verdict.inTop3
         ? 'top-3'
-        : 'not top-3';
+        : inTop5
+          ? 'top-5'
+          : 'not top-5';
 
   return (
     <aside

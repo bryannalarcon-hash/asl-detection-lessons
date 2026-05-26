@@ -38,7 +38,7 @@ export interface InitMsg {
   confThresh: number;
   voteFrac: number;
   twoPass: boolean;
-  matchMode: 'top1' | 'top3';
+  matchMode: 'top1' | 'top3' | 'top5';
   precision: 'fp32' | 'fp16';
   net1Stride: number;
 }
@@ -112,7 +112,7 @@ let idxToGloss: string[] = [];
 let confThresh = 0.25;
 let voteFrac = 0.8;
 let twoPass = false; // 1-pass Net3 by default
-let matchMode: 'top1' | 'top3' = 'top1';
+let matchMode: 'top1' | 'top3' | 'top5' = 'top1';
 let precision: 'fp32' | 'fp16' = 'fp32';
 let net1Stride = 32;
 
@@ -234,9 +234,10 @@ async function handleRep(msg: RepMsg): Promise<void> {
     }
 
     const isTop1 = topK.length > 0 && topK[0].gloss === target;
-    // Acceptance stays top-3 even though we now return/show the top-5.
     const inTop3 = topK.slice(0, 3).some((e) => e.gloss === target);
-    const matched = matchMode === 'top3' ? inTop3 : isTop1;
+    const inTop5 = topK.some((e) => e.gloss === target);
+    const matched =
+      matchMode === 'top5' ? inTop5 : matchMode === 'top3' ? inTop3 : isTop1;
     const pass = verifierPassed || matched;
 
     post({
