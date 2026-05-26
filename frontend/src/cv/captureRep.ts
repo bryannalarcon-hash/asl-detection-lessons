@@ -52,6 +52,9 @@ interface Pending<T> {
 
 let worker: Worker | null = null;
 let initPending: Pending<InitCaptureRepResult> | null = null;
+// Cached init promise so initCaptureRep is idempotent across concurrent / repeat
+// calls (React StrictMode double-invokes effects in dev). Cleared on dispose.
+let initPromise: Promise<InitCaptureRepResult> | null = null;
 let repPending: Pending<RepVerdict> | null = null;
 let repReqId = 0;
 // The reqId of the rep currently awaiting a verdict. A verdict/error whose
@@ -125,10 +128,11 @@ function handleMessage(msg: FromWorker): void {
  * GPU shaders, and resolve once the backend + warm-up latency are known.
  */
 export function initCaptureRep(cfg: CaptureRepConfig): Promise<InitCaptureRepResult> {
+  // Idempotent: reuse an in-flight or completed init rather than erroring, so a
+  // StrictMode double-mount (or any racing caller) doesn't trip "already in
+  // flight" and silently disable the in-app CV.
+  if (initPromise) return initPromise;
   const w = ensureWorker();
-  if (initPending) {
-    return Promise.reject(new Error('initCaptureRep already in flight'));
-  }
   const init: InitMsg = {
     type: 'init',
     glossToIdx: cfg.glossToIdx,
@@ -139,10 +143,11 @@ export function initCaptureRep(cfg: CaptureRepConfig): Promise<InitCaptureRepRes
     twoPass: cfg.twoPass ?? false,
     matchMode: 'top1',
   };
-  return new Promise<InitCaptureRepResult>((resolve, reject) => {
+  initPromise = new Promise<InitCaptureRepResult>((resolve, reject) => {
     initPending = { resolve, reject };
     w.postMessage(init);
   });
+  return initPromise;
 }
 
 /**
@@ -202,4 +207,5 @@ export function disposeCaptureRep(): void {
   repPending?.reject(err);
   initPending = null;
   repPending = null;
+  initPromise = null;
 }

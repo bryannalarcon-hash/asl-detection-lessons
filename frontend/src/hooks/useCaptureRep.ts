@@ -176,6 +176,7 @@ export function useCaptureRep(): UseCaptureRepResult {
           gloss_to_idx: Record<string, number>;
         };
         const glossToIdx = data.gloss_to_idx;
+        if (cancelled) return;
         const result = await initCaptureRep({ glossToIdx });
         if (cancelled) return;
         glossSetRef.current = new Set(Object.keys(glossToIdx));
