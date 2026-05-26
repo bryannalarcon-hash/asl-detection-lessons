@@ -31,7 +31,7 @@ export interface RepVerdict {
   verifierPassed: boolean;
   isTop1: boolean;
   inTop3: boolean;
-  top3: { gloss: string; prob: number }[];
+  topK: { gloss: string; prob: number }[];
   targetConf: number;
   cascadeMs: number;
   classifyMs: number;
@@ -104,7 +104,7 @@ function handleMessage(msg: FromWorker): void {
         verifierPassed: msg.verifierPassed,
         isTop1: msg.isTop1,
         inTop3: msg.inTop3,
-        top3: msg.top3,
+        topK: msg.topK,
         targetConf: msg.targetConf,
         cascadeMs: msg.cascadeMs,
         classifyMs: msg.classifyMs,

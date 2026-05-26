@@ -78,7 +78,7 @@ export interface VerdictMsg {
   verifierPassed: boolean;
   isTop1: boolean;
   inTop3: boolean;
-  top3: { gloss: string; prob: number }[];
+  topK: { gloss: string; prob: number }[];
   targetConf: number;
   cascadeMs: number;
   classifyMs: number;
@@ -207,10 +207,10 @@ async function handleRep(msg: RepMsg): Promise<void> {
       H,
       idxToGloss,
       DEFAULT_NET4_DATA_CONFIG,
-      3,
+      5,
     );
     const classifyMs = performance.now() - tCls0;
-    const top3 = clip.topk.map((e) => ({ gloss: e.gloss, prob: e.prob }));
+    const topK = clip.topk.map((e) => ({ gloss: e.gloss, prob: e.prob }));
     const tidx = target in glossToIdx ? glossToIdx[target] : -1;
     const targetConf = tidx >= 0 ? clip.probs[tidx] : 0;
 
@@ -233,8 +233,9 @@ async function handleRep(msg: RepMsg): Promise<void> {
       targetConfMean = v.targetConfMean;
     }
 
-    const isTop1 = top3.length > 0 && top3[0].gloss === target;
-    const inTop3 = top3.some((e) => e.gloss === target);
+    const isTop1 = topK.length > 0 && topK[0].gloss === target;
+    // Acceptance stays top-3 even though we now return/show the top-5.
+    const inTop3 = topK.slice(0, 3).some((e) => e.gloss === target);
     const matched = matchMode === 'top3' ? inTop3 : isTop1;
     const pass = verifierPassed || matched;
 
@@ -246,7 +247,7 @@ async function handleRep(msg: RepMsg): Promise<void> {
       verifierPassed,
       isTop1,
       inTop3,
-      top3,
+      topK,
       targetConf,
       framesProcessed: T,
       handsFrames,

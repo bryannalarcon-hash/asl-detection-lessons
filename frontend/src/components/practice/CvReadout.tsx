@@ -96,7 +96,7 @@ export function CvReadout({ verdict, backend, ready, notReady, target }: CvReado
           </div>
           <table className="mt-1.5 w-full max-w-[220px]">
             <tbody>
-              {verdict.top3.map((e, i) => (
+              {verdict.topK.map((e, i) => (
                 <tr key={e.gloss}>
                   <td className="py-0.5 text-fg">
                     {i + 1}. {e.gloss}

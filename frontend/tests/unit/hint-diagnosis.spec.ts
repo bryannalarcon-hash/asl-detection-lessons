@@ -15,7 +15,7 @@ function makeVerdict(over: Partial<RepVerdict> = {}): RepVerdict {
     verifierPassed: false,
     isTop1: false,
     inTop3: true,
-    top3: [{ gloss: 'MOM', prob: 0.4 }],
+    topK: [{ gloss: 'MOM', prob: 0.4 }],
     targetConf: 0.4,
     cascadeMs: 0,
     classifyMs: 0,
