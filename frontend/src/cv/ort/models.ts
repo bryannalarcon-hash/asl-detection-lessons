@@ -6,7 +6,7 @@
 //   net1  results/v3/net1_v3_1/best_export.pt    KeypointDetector  (K=7 sliced)
 //   net2  results/v3/net2_v3_1/best.pt           PalmDetector (FPN, NO kpt head)
 //   net3  results/v3/net3/best.pt                HandLandmarkRegNet (regression)
-//   net4  results/v3/net4_popsign_baseline40/best.pt  SignClassifier (96 cls)
+//   net4  results/v3/net4_popsign_125word/best.pt  SignClassifier (96 cls)
 //
 // Only the PURE conv/transformer forwards are in-graph. All glue (letterbox,
 // soft-argmax, anchor decode + NMS, crop/rotate/2-pass, 343-dim feature build,

@@ -44,7 +44,7 @@ PARITY_TOL = 1e-3
 NET1_CKPT = REPO_ROOT / "results" / "v3" / "net1_v3_1" / "best_export.pt"
 NET2_CKPT = REPO_ROOT / "results" / "v3" / "net2_v3_1" / "best.pt"
 NET3_CKPT = REPO_ROOT / "results" / "v3" / "net3" / "best.pt"
-NET4_CKPT = REPO_ROOT / "results" / "v3" / "net4_popsign_baseline40" / "best.pt"
+NET4_CKPT = REPO_ROOT / "results" / "v3" / "net4_popsign_125word" / "best.pt"
 
 NET1_INPUT = 256   # letterboxed full-frame input
 NET2_INPUT = 256   # letterboxed full-frame input
