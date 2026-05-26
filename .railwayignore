@@ -36,11 +36,13 @@ tests
 .scaffold-*-report.md
 *.log
 
-# Large assets that blow the upload limit (hosted/handled separately):
-#  - lesson videos (578MB) -> reference video falls back to the mock on prod
-#  - fp16 model set (33MB, unused by default; app loads the fp32 .onnx)
+# Heavy runtime assets are served from a mounted volume (ASSETS_DIR), seeded
+# over HTTP via the guarded /api/_seed route — keep them out of the deploy
+# upload (also avoids the ~700MB 413). The tiny gloss_to_idx.json stays.
+#  - lesson videos (578MB), fp32 .onnx (93MB), fp16 set (33MB, unused)
 frontend/public/videos
+frontend/public/models/*.onnx
 frontend/public/models/fp16
 
-# KEPT: frontend/public/models/*.onnx (fp32, ~93MB) + gloss_to_idx.json,
-# configs/, scripts/*.ts, backend/, frontend/ — needed to build + serve.
+# KEPT: frontend/public/models/gloss_to_idx.json, configs/, scripts/*.ts,
+# backend/, frontend/ — needed to build + serve.

@@ -33,5 +33,9 @@ scripts/*.sh
 .scaffold-*-report.md
 *.log
 
-# NOTE: frontend/public (lesson videos + ONNX models) is intentionally KEPT —
-# the app serves those. configs/, scripts/*.ts, backend/, frontend/ are kept.
+# Heavy runtime assets live on a mounted volume in prod (ASSETS_DIR), seeded
+# separately — keep them out of the image. The tiny gloss_to_idx.json stays as
+# an in-image fallback. configs/, scripts/*.ts, backend/, frontend/ are kept.
+frontend/public/models/*.onnx
+frontend/public/models/fp16
+frontend/public/videos
