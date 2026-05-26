@@ -3,9 +3,19 @@
 Session resume points. Active handoffs live here; superseded ones are in
 `archive/`. Later handoffs supersede earlier ones on overlapping topics.
 
-## Current state (2026-05-25)
+## Current state (2026-05-26)
 
-MediaPipe-gap retrain round in progress. Net 3 was rewritten heatmap →
+The app is **deployed + live on Railway** (https://asl-pilot-api-production.up.railway.app):
+SPA + API + Postgres + auth + lessons catalog + dashboard all work; the real
+capture-rep CV + hint system are wired into the practice flow. Two open issues:
+prod doesn't serve the gitignored CV models + reference videos (excluded from
+`railway up`; nyan fallback + CV disabled on prod), and the camera self-view
+doesn't appear on the deployed site. Net 4 is the 125/word model (test
+top-1 0.78 / top-3 0.91). **Start at `HANDOFF_DEPLOY.md`.**
+
+## Prior state (2026-05-25)
+
+MediaPipe-gap retrain round. Net 3 was rewritten heatmap →
 **direct coordinate regression** and trained (held-out FreiHAND
 **val_pck_05 = 0.45**, up from the old heatmap net's 0.32). The new
 keypoint-head Net 2 under-trained and regressed as a detector (AP 0.016 vs
@@ -16,8 +26,13 @@ note `project_net_v3_regression_round.md`.
 
 ## Active
 
+### Deploy / app track
+- **`HANDOFF_DEPLOY.md`** — CURRENT. The Railway deploy (URL, service/Postgres
+  IDs, env, boot CMD), what works vs the prod asset/camera gaps + exact next
+  steps, the local dev state, everything that shipped this session, and gotchas.
+
 ### ML training track
-- **`HANDOFF_WEBGPU_E2E.md`** — CURRENT. Compaction resume point: what's RUNNING
+- **`HANDOFF_WEBGPU_E2E.md`** — prior compaction resume point: what's RUNNING
   (pod B top-up, cron, :8601 PoC, perfworker agent), models incl. the Net 4
   baseline, the WebGPU browser port, the capture-rep PoC, next steps, gotchas.
 - **`HANDOFF_REGRESSION_ROUND.md`** — prior round (Net 3 regression + the net2
