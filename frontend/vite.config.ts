@@ -29,12 +29,13 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         runtimeCaching: [
           {
-            urlPattern: /\/videos\/.*\.mp4$/,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'reference-videos',
-              expiration: { maxEntries: 10, maxAgeSeconds: 7 * 24 * 60 * 60 },
-            },
+            // Always go to network for lesson videos. A prior CacheFirst rule
+            // poisoned the cache: before models/videos were served, these URLs
+            // returned the SPA index.html (200), which CacheFirst then served
+            // forever as the "video" — the element errored and fell back to the
+            // mock clip. The browser's HTTP cache (range-capable) covers replays.
+            urlPattern: /\/videos\/.*\.(mp4|webm)$/,
+            handler: 'NetworkOnly',
           },
           {
             urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
