@@ -1,48 +1,49 @@
-# Upload filter for `railway up --no-gitignore`. We pass --no-gitignore so the
-# gitignored runtime assets the app SERVES (frontend/public/videos + /models)
-# get uploaded — this list re-excludes the heavy non-app dirs that .gitignore
-# would otherwise have removed.
+# Upload filter for `railway up`. Patterns are gitignore-style: an UNANCHORED
+# name like `src` matches that dir at ANY depth (incl. frontend/src,
+# backend/src) and will break the build — so every repo-root dir below is
+# anchored with a leading slash to match only the top level.
 node_modules
 **/node_modules
 **/dist
 .git
 
 # Huge non-app artifacts (model checkpoints, datasets, venvs)
-results
-data
-.venv-demo
-.venv
+/results
+/data
+/.venv-demo
+/.venv
 *.zip
 *.pdf
 *.tgz
 ruvector.db
 
 # Python CV training code + infra (not part of the web app)
-src
-modal_apps
-tools
-playground
+/src
+/modal_apps
+/tools
+/playground
 scripts/*.py
 scripts/*.sh
 
 # Docs / dev artifacts not needed at runtime
-docs
-design
-costs
-logs
-screenshots
-test-results
-tests
+/docs
+/design
+/costs
+/logs
+/screenshots
+/test-results
+/tests
 .scaffold-*-report.md
 *.log
 
 # Heavy runtime assets are served from a mounted volume (ASSETS_DIR), seeded
-# over HTTP via the guarded /api/_seed route — keep them out of the deploy
-# upload (also avoids the ~700MB 413). The tiny gloss_to_idx.json stays.
+# over HTTP via the guarded /api/_seed route. They're gitignored too, so a
+# plain `railway up` (no --no-gitignore) already drops them; listed here so
+# the exclusion is explicit and survives a --no-gitignore deploy.
 #  - lesson videos (578MB), fp32 .onnx (93MB), fp16 set (33MB, unused)
 frontend/public/videos
 frontend/public/models/*.onnx
 frontend/public/models/fp16
 
 # KEPT: frontend/public/models/gloss_to_idx.json, configs/, scripts/*.ts,
-# backend/, frontend/ — needed to build + serve.
+# backend/, frontend/ (incl. frontend/src, backend/src) — needed to build+serve.
