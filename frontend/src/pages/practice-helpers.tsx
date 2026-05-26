@@ -26,13 +26,11 @@ export function CameraPanelWrapper({
   boxState,
   mirror,
   paused,
-  matchScore,
   onVideoEl,
 }: {
   boxState: BoxState;
   mirror: boolean;
   paused: boolean;
-  matchScore?: number;
   onVideoEl?: (el: HTMLVideoElement | null) => void;
 }) {
   const [canUseCamera] = useState<boolean>(
@@ -52,7 +50,6 @@ export function CameraPanelWrapper({
       boxState={boxState}
       mirror={mirror}
       paused={paused}
-      matchScore={matchScore}
       onVideoEl={onVideoEl}
     />
   );

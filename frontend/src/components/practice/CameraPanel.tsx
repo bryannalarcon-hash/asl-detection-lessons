@@ -10,8 +10,6 @@ interface CameraPanelProps {
   mirror?: boolean;
   /** When true, suspend the camera stream — used by the pause modal. */
   paused?: boolean;
-  /** Live match score 0–1 from the CV layer. Drives the "±N% match" overlay. */
-  matchScore?: number;
   /** Optional caption override; defaults to "live · on-device" / "paused". */
   captionMeta?: string;
   /** Optional floating overlay node (e.g. additional pills). */
@@ -40,7 +38,6 @@ export function CameraPanel({
   boxState,
   mirror = true,
   paused = false,
-  matchScore,
   captionMeta,
   overlay,
   onVideoEl,
@@ -93,9 +90,6 @@ export function CameraPanel({
   }, [paused, state]);
 
   const metaLine = captionMeta ?? (paused ? 'paused' : 'live · on-device');
-  const matchPct = typeof matchScore === 'number'
-    ? Math.round(Math.min(Math.max(matchScore, 0), 1) * 100)
-    : null;
 
   return (
     <div
@@ -174,20 +168,6 @@ export function CameraPanel({
           {metaLine}
         </span>
       </div>
-
-      {/* Top-right floating pill: match score + live dot */}
-      {matchPct !== null && !paused && state.kind === 'granted' && (
-        <div
-          data-testid="camera-match-pill"
-          className="pointer-events-none absolute right-3.5 top-3.5 flex items-center gap-2 rounded-full bg-bg-deep/70 px-3 py-1.5 text-[0.78rem] text-fg backdrop-blur-md"
-        >
-          <span className="font-mono">±{matchPct}% match</span>
-          <span
-            aria-hidden="true"
-            className="inline-block h-2 w-2 rounded-full bg-success shadow-[0_0_0_4px_rgba(52,211,153,0.25)] motion-safe:animate-pulse"
-          />
-        </div>
-      )}
 
       {/* Floating dev camera toolbox (top-right when no overlay competes) */}
       <div className="pointer-events-auto absolute bottom-3 right-3 z-10">

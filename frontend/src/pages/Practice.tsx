@@ -133,7 +133,6 @@ export default function PracticePage() {
   const capture = useCaptureRep();
   const { resetVerdict } = capture;
   const videoElRef = useRef<HTMLVideoElement | null>(null);
-  const [matchScore, setMatchScore] = useState<number | undefined>(undefined);
   const [showRetry, setShowRetry] = useState(false);
   // Bumped once per fresh failed recorded attempt to auto-open the targeted hint.
   const [hintOpenSignal, setHintOpenSignal] = useState(0);
@@ -222,8 +221,7 @@ export default function PracticePage() {
         setCongratsSign(prevSignGlossRef.current);
       }
       signSkippedRef.current = false;
-      // Clear CV match feedback so it doesn't bleed into the next sign.
-      setMatchScore(undefined);
+      // Clear CV feedback so it doesn't bleed into the next sign.
       setShowRetry(false);
       setBoxState('gray');
       // Drop the last verdict too, so manually opening the hint on the new
@@ -262,10 +260,8 @@ export default function PracticePage() {
       return;
     }
     if (verdict.pass) {
-      setMatchScore(verdict.targetConf);
       setBoxState('green');
     } else {
-      setMatchScore(verdict.targetConf);
       setBoxState('red');
       setShowRetry(true);
       // Surface the targeted hint for this failed attempt (debounced via the
@@ -361,7 +357,6 @@ export default function PracticePage() {
               boxState={boxState}
               mirror={settings.mirror}
               paused={paused}
-              matchScore={matchScore}
               onVideoEl={(el) => {
                 videoElRef.current = el;
               }}

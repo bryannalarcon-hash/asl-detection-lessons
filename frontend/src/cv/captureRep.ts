@@ -141,7 +141,10 @@ export function initCaptureRep(cfg: CaptureRepConfig): Promise<InitCaptureRepRes
     confThresh: cfg.confThresh ?? 0.25,
     voteFrac: cfg.voteFrac ?? 0.8,
     twoPass: cfg.twoPass ?? false,
-    matchMode: 'top1',
+    // Top-3 acceptance: a rep passes if the target is among the model's top 3
+    // (78% top-1 vs 91% top-3, and wasm-EP keypoints are rougher) — fairer for
+    // the learner. The verifier vote still gates alongside it.
+    matchMode: 'top3',
   };
   initPromise = new Promise<InitCaptureRepResult>((resolve, reject) => {
     initPending = { resolve, reject };
