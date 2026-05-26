@@ -1,0 +1,40 @@
+# Upload filter for `railway up --no-gitignore`. We pass --no-gitignore so the
+# gitignored runtime assets the app SERVES (frontend/public/videos + /models)
+# get uploaded — this list re-excludes the heavy non-app dirs that .gitignore
+# would otherwise have removed.
+node_modules
+**/node_modules
+**/dist
+.git
+
+# Huge non-app artifacts (model checkpoints, datasets, venvs)
+results
+data
+.venv-demo
+.venv
+*.zip
+*.pdf
+*.tgz
+ruvector.db
+
+# Python CV training code + infra (not part of the web app)
+src
+modal_apps
+tools
+playground
+scripts/*.py
+scripts/*.sh
+
+# Docs / dev artifacts not needed at runtime
+docs
+design
+costs
+logs
+screenshots
+test-results
+tests
+.scaffold-*-report.md
+*.log
+
+# KEPT: frontend/public (lesson videos + ONNX models), configs/, scripts/*.ts,
+# backend/, frontend/ — all needed to build + serve the app.
