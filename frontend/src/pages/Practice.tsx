@@ -145,6 +145,10 @@ export default function PracticePage() {
   const capture = useCaptureRep();
   const { resetVerdict } = capture;
   const videoElRef = useRef<HTMLVideoElement | null>(null);
+  // Mirror the video element's presence in state: the ref alone can't gate the
+  // record button because ref writes don't re-render, so the button stayed
+  // disabled after the camera detached/reattached on a lesson switch.
+  const [videoElReady, setVideoElReady] = useState(false);
   const [showRetry, setShowRetry] = useState(false);
   // Dev-only CV diagnostics overlay, toggled from the dev panel (persisted).
   const [cvReadoutOn, setCvReadoutOn] = useState(readCvReadoutPref);
@@ -375,6 +379,7 @@ export default function PracticePage() {
               paused={paused}
               onVideoEl={(el) => {
                 videoElRef.current = el;
+                setVideoElReady(!!el);
               }}
             />
           )}
@@ -438,7 +443,7 @@ export default function PracticePage() {
               <RecordAttemptRow
                 phase={capture.phase}
                 countdown={capture.countdown}
-                disabled={capture.recording || !videoElRef.current}
+                disabled={capture.recording || !videoElReady}
                 showRetry={showRetry}
                 onRecord={() => void onRecordAttempt()}
               />
