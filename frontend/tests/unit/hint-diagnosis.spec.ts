@@ -21,6 +21,13 @@ function makeVerdict(over: Partial<RepVerdict> = {}): RepVerdict {
     classifyMs: 0,
     framesProcessed: 30,
     handsFrames: 30,
+    net1Ms: 0,
+    net2Ms: 0,
+    net3Ms: 0,
+    glueMs: 0,
+    passFraction: 0,
+    nWindows: 0,
+    targetConfMean: 0,
     ...over,
   };
 }

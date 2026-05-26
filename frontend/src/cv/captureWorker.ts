@@ -84,6 +84,15 @@ export interface VerdictMsg {
   classifyMs: number;
   framesProcessed: number;
   handsFrames: number;
+  // Per-net inference timing + verifier window detail — for the dev CV readout
+  // (full parity with the PoC/demo diagnostics).
+  net1Ms: number;
+  net2Ms: number;
+  net3Ms: number;
+  glueMs: number;
+  passFraction: number;
+  nWindows: number;
+  targetConfMean: number;
 }
 
 export interface ErrorMsg {
@@ -179,12 +188,13 @@ async function handleRep(msg: RepMsg): Promise<void> {
 
     // Cascade, BATCHED.
     const tCas0 = performance.now();
-    const { kFlat, vFlat, present, handsFrames } = await runtime.processClip(
+    const { kFlat, vFlat, present, handsFrames, runMs } = await runtime.processClip(
       rgbs,
       twoPass,
       net1Stride,
     );
     const cascadeMs = performance.now() - tCas0;
+    const glueMs = Math.max(0, cascadeMs - (runMs.net1 + runMs.net2 + runMs.net3));
 
     // Net4 clip classification -> top-3 + full softmax (for target conf).
     const tCls0 = performance.now();
@@ -212,9 +222,15 @@ async function handleRep(msg: RepMsg): Promise<void> {
     }
 
     let verifierPassed = false;
+    let passFraction = 0;
+    let nWindows = 0;
+    let targetConfMean = 0;
     if (tidx >= 0) {
       const v = verifier.verify(target);
       verifierPassed = v.verified;
+      passFraction = v.passFraction;
+      nWindows = v.nWindows;
+      targetConfMean = v.targetConfMean;
     }
 
     const isTop1 = top3.length > 0 && top3[0].gloss === target;
@@ -236,6 +252,13 @@ async function handleRep(msg: RepMsg): Promise<void> {
       handsFrames,
       cascadeMs,
       classifyMs,
+      net1Ms: runMs.net1,
+      net2Ms: runMs.net2,
+      net3Ms: runMs.net3,
+      glueMs,
+      passFraction,
+      nWindows,
+      targetConfMean,
     });
   } catch (err) {
     post({ type: 'error', reqId: msg.reqId, message: (err as Error).message });

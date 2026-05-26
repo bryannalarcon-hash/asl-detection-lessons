@@ -8,6 +8,8 @@ interface DevPanelProps {
   onSkipDrill: () => void;
   onAutoPassRep: () => void;
   onFailRep: () => void;
+  cvReadoutOn: boolean;
+  onToggleCvReadout: () => void;
 }
 
 const BTN =
@@ -20,6 +22,8 @@ export function DevPanel({
   onSkipDrill,
   onAutoPassRep,
   onFailRep,
+  cvReadoutOn,
+  onToggleCvReadout,
 }: DevPanelProps) {
   if (!isDevToolsEnabled()) return null;
 
@@ -102,6 +106,18 @@ export function DevPanel({
           className={BTN}
         >
           Fail rep
+        </button>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          data-testid="dev-toggle-cv-readout"
+          data-dev-override
+          onClick={onToggleCvReadout}
+          aria-pressed={cvReadoutOn}
+          className={BTN}
+        >
+          CV readout: {cvReadoutOn ? 'on' : 'off'}
         </button>
       </div>
     </aside>

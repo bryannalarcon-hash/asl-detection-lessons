@@ -37,6 +37,14 @@ export interface RepVerdict {
   classifyMs: number;
   framesProcessed: number;
   handsFrames: number;
+  // Per-net timing + verifier window detail (surfaced in the dev CV readout).
+  net1Ms: number;
+  net2Ms: number;
+  net3Ms: number;
+  glueMs: number;
+  passFraction: number;
+  nWindows: number;
+  targetConfMean: number;
 }
 
 export interface InitCaptureRepResult {
@@ -102,6 +110,13 @@ function handleMessage(msg: FromWorker): void {
         classifyMs: msg.classifyMs,
         framesProcessed: msg.framesProcessed,
         handsFrames: msg.handsFrames,
+        net1Ms: msg.net1Ms,
+        net2Ms: msg.net2Ms,
+        net3Ms: msg.net3Ms,
+        glueMs: msg.glueMs,
+        passFraction: msg.passFraction,
+        nWindows: msg.nWindows,
+        targetConfMean: msg.targetConfMean,
       });
       repPending = null;
       break;

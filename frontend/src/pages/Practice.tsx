@@ -26,6 +26,11 @@ import { RepCounter } from '@/components/practice/RepCounter';
 import { SelfReportRow } from '@/components/practice/SelfReportRow';
 import { RecordAttemptRow } from '@/components/practice/RecordAttemptRow';
 import { DevPanel } from '@/components/practice/DevPanel';
+import {
+  CvReadout,
+  readCvReadoutPref,
+  writeCvReadoutPref,
+} from '@/components/practice/CvReadout';
 import { HintButton } from '@/components/practice/HintButton';
 import { type BoxState } from '@/components/practice/BoundingBox';
 import { PracticeHeader } from '@/components/practice/PracticeHeader';
@@ -134,6 +139,8 @@ export default function PracticePage() {
   const { resetVerdict } = capture;
   const videoElRef = useRef<HTMLVideoElement | null>(null);
   const [showRetry, setShowRetry] = useState(false);
+  // Dev-only CV diagnostics overlay, toggled from the dev panel (persisted).
+  const [cvReadoutOn, setCvReadoutOn] = useState(readCvReadoutPref);
   // Bumped once per fresh failed recorded attempt to auto-open the targeted hint.
   const [hintOpenSignal, setHintOpenSignal] = useState(0);
 
@@ -449,7 +456,25 @@ export default function PracticePage() {
           onSkipDrill={() => send({ type: 'SKIP_DRILL' })}
           onAutoPassRep={() => send({ type: 'PASS' })}
           onFailRep={() => send({ type: 'FAIL' })}
+          cvReadoutOn={cvReadoutOn}
+          onToggleCvReadout={() =>
+            setCvReadoutOn((v) => {
+              const next = !v;
+              writeCvReadoutPref(next);
+              return next;
+            })
+          }
         />
+
+        {cvReadoutOn && (
+          <CvReadout
+            verdict={capture.lastVerdict}
+            backend={capture.backend}
+            ready={capture.ready}
+            notReady={capture.notReady}
+            target={targetGloss}
+          />
+        )}
 
         <SignCompleteToast
           sign={congratsSign}
