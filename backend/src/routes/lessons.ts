@@ -13,6 +13,9 @@ const app = new Hono();
  * column, which is denormalized seed metadata).
  */
 app.get('/', async (c) => {
+  // Re-aggregate the live sign count per lesson (source of truth in case the
+  // denormalized lesson.sign_count drifts). LEFT JOIN + GROUP BY so lessons
+  // with zero signs still return a row with count 0.
   const rows = await db
     .select({
       id: lesson.id,
@@ -20,14 +23,12 @@ app.get('/', async (c) => {
       title: lesson.title,
       category: lesson.category,
       orderIndex: lesson.orderIndex,
-      // Denormalized count from the lesson row; we re-aggregate below as the
-      // source of truth in case seed data drifts.
       declaredSignCount: lesson.signCount,
-      signCount: sql<number>`(
-        SELECT COUNT(*)::int FROM ${sign} WHERE ${sign.lessonId} = ${lesson.id}
-      )`,
+      signCount: sql<number>`count(${sign.id})::int`,
     })
     .from(lesson)
+    .leftJoin(sign, eq(sign.lessonId, lesson.id))
+    .groupBy(lesson.id)
     .orderBy(asc(lesson.orderIndex));
 
   return c.json({ lessons: rows });
