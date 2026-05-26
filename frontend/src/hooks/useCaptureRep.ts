@@ -7,7 +7,7 @@ import {
 
 // Capture tuning — ported from the validated playground capture loop.
 const COUNTDOWN_SEC = 3;
-const RECORD_MS = 5000; // ~5s capture window
+const RECORD_MS = 3000; // ~3s capture window (closer to a sign's duration)
 const MAX_FRAMES = 64; // Net4's full trained window; sampling/culling targets this
 
 // Motion-gated culling tuning (drop near-static runs before the cascade).
@@ -35,7 +35,7 @@ export interface UseCaptureRepResult {
   /** True if `gloss` is a known model class (case-sensitive, already uppercased). */
   hasGloss(gloss: string): boolean;
   /**
-   * Run a full rep: 3-2-1 countdown, ~5s capture from `videoEl`, cull+sample to
+   * Run a full rep: 3-2-1 countdown, ~3s capture from `videoEl`, cull+sample to
    * <=64 frames, then evaluate against `targetGloss`. Resolves with the verdict,
    * or null if not ready / capture produced no frames / evaluation threw.
    */
@@ -215,7 +215,7 @@ export function useCaptureRep(): UseCaptureRepResult {
         }
         setCountdown(0);
 
-        // ~5s record.
+        // ~3s record.
         setPhase('recording');
         const raw = await captureFrames(videoEl);
         if (disposedRef.current) return null;

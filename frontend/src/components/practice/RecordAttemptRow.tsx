@@ -25,7 +25,7 @@ function labelForPhase(phase: CapturePhase, countdown: number): string {
 }
 
 /**
- * In-browser CV affordance: records a ~5s clip and runs the on-device cascade
+ * In-browser CV affordance: records a ~3s clip and runs the on-device cascade
  * to verify the sign. Sits alongside SelfReportRow, which remains the manual
  * fallback. Only rendered when the capture hook is ready.
  */
