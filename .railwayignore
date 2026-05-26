@@ -36,5 +36,11 @@ tests
 .scaffold-*-report.md
 *.log
 
-# KEPT: frontend/public (lesson videos + ONNX models), configs/, scripts/*.ts,
-# backend/, frontend/ — all needed to build + serve the app.
+# Large assets that blow the upload limit (hosted/handled separately):
+#  - lesson videos (578MB) -> reference video falls back to the mock on prod
+#  - fp16 model set (33MB, unused by default; app loads the fp32 .onnx)
+frontend/public/videos
+frontend/public/models/fp16
+
+# KEPT: frontend/public/models/*.onnx (fp32, ~93MB) + gloss_to_idx.json,
+# configs/, scripts/*.ts, backend/, frontend/ — needed to build + serve.
