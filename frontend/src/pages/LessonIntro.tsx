@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { lessonsApi } from '@/lib/api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { lessonsApi, progressApi } from '@/lib/api';
 import { isDevToolsEnabled } from '@/lib/env';
 import { useAppSettings } from '@/lib/settings';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -25,6 +25,7 @@ export default function LessonIntroPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { settings } = useAppSettings();
+  const queryClient = useQueryClient();
 
   // Back-to-catalog should return to the page that brought the user here.
   // Dashboard's "Continue last lesson" link passes `state.from = '/dashboard'`.
@@ -51,6 +52,19 @@ export default function LessonIntroPage() {
 
   const lesson = lessonQuery.data?.lesson;
   const signs = lessonQuery.data?.signs ?? [];
+
+  const resetMutation = useMutation({
+    mutationFn: () => progressApi.resetLesson(slug),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['progress', 'dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['lessons', 'get', slug] });
+    },
+  });
+
+  const handleReset = () => {
+    if (!window.confirm('Reset your progress for this lesson?')) return;
+    resetMutation.mutate();
+  };
 
   const handleStart = () => {
     const params = new URLSearchParams({
@@ -190,6 +204,15 @@ export default function LessonIntroPage() {
               >
                 ← {backLabel}
               </Link>
+              <button
+                type="button"
+                onClick={handleReset}
+                disabled={resetMutation.isPending}
+                data-testid="lesson-reset-progress"
+                className="block w-full text-center font-mono text-xs text-fg-subtle hover:text-fg disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {resetMutation.isPending ? 'Resetting…' : 'Reset progress'}
+              </button>
               {isDevToolsEnabled() && (
                 <Link
                   to="/dev/lesson-config"

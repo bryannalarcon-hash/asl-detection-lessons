@@ -206,6 +206,10 @@ export const progressApi = {
   dashboard: () => apiFetch('/api/progress/dashboard').then(parseJson<DashboardDto>),
   day: (date: string) =>
     apiFetch(`/api/progress/day/${encodeURIComponent(date)}`).then(parseJson<DayDetailDto>),
+  resetLesson: (slug: string) =>
+    apiFetch(`/api/progress/lesson/${encodeURIComponent(slug)}/reset`, {
+      method: 'POST',
+    }).then(parseJson<{ ok: boolean; signsReset: number }>),
 };
 
 export const healthApi = {

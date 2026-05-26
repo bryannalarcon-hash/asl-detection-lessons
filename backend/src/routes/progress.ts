@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { and, desc, eq, max, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, max, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/client';
 import {
@@ -410,6 +410,42 @@ app.get('/day/:date', async (c) => {
     outcomes: outcomeCounts,
     lessons: lessonRows,
   });
+});
+
+// === POST /api/progress/lesson/:slug/reset ===
+
+app.post('/lesson/:slug/reset', async (c) => {
+  const userId = getSessionUserId(c);
+  if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+
+  const slug = c.req.param('slug');
+
+  const lessonRows = await db
+    .select({ id: lesson.id })
+    .from(lesson)
+    .where(eq(lesson.slug, slug))
+    .limit(1);
+  const lessonRow = lessonRows[0];
+  if (!lessonRow) return c.json({ error: 'Lesson not found' }, 404);
+
+  const signRows = await db
+    .select({ id: sign.id })
+    .from(sign)
+    .where(eq(sign.lessonId, lessonRow.id));
+  const signIds = signRows.map((s) => s.id);
+
+  if (signIds.length === 0) {
+    return c.json({ ok: true, signsReset: 0 });
+  }
+
+  await db
+    .delete(masteryState)
+    .where(and(eq(masteryState.userId, userId), inArray(masteryState.signId, signIds)));
+  await db
+    .delete(repLog)
+    .where(and(eq(repLog.userId, userId), inArray(repLog.signId, signIds)));
+
+  return c.json({ ok: true, signsReset: signIds.length });
 });
 
 export default app;
