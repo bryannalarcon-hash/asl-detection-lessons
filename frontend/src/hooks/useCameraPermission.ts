@@ -224,5 +224,34 @@ export function useCameraPermission(
     };
   }, [teardownStream]);
 
+  // Auto-recover after the user resets a previously-denied camera permission.
+  // Browsers won't re-prompt a denied site, and the app would otherwise sit in
+  // `denied` forever (no reload needed otherwise). Listen to the Permissions
+  // API: when camera flips back to granted/prompt and we hold no stream, kick
+  // off a fresh request so the camera comes back on its own. Feature-detected;
+  // a no-op where the camera permission can't be queried.
+  useEffect(() => {
+    const perms = navigator.permissions;
+    if (!perms?.query) return;
+    let status: PermissionStatus | null = null;
+    let active = true;
+    perms
+      .query({ name: 'camera' as PermissionName })
+      .then((s) => {
+        if (!active) return;
+        status = s;
+        s.onchange = () => {
+          if ((s.state === 'granted' || s.state === 'prompt') && !streamRef.current) {
+            void request();
+          }
+        };
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+      if (status) status.onchange = null;
+    };
+  }, [request]);
+
   return { state, request, stop, forceState };
 }
