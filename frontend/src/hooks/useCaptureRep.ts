@@ -17,6 +17,15 @@ const CULL_MAX_GAP = 6;
 
 export type CapturePhase = 'idle' | 'countdown' | 'recording' | 'evaluating';
 
+/** Retained frames of one attempt, for dev replay (in-memory, not persisted). */
+export interface CaptureClip {
+  frames: ImageData[];
+  width: number;
+  height: number;
+  passed: boolean;
+  target: string;
+}
+
 export interface UseCaptureRepResult {
   /** True once the worker has loaded the nets and warmed up. */
   ready: boolean;
@@ -29,6 +38,9 @@ export interface UseCaptureRepResult {
   /** Seconds left on the countdown (0 outside countdown). */
   countdown: number;
   lastVerdict: RepVerdict | null;
+  /** Frames of the most recent attempt, for the dev replay button. Null until
+   *  the first rep. In-memory only — discarded on unmount/reload. */
+  lastClip: CaptureClip | null;
   /** Clear the last verdict (call on sign advance so a stale diagnosis can't
    * bleed into a new sign's hint). */
   resetVerdict(): void;
@@ -157,6 +169,7 @@ export function useCaptureRep(): UseCaptureRepResult {
   const [phase, setPhase] = useState<CapturePhase>('idle');
   const [countdown, setCountdown] = useState(0);
   const [lastVerdict, setLastVerdict] = useState<RepVerdict | null>(null);
+  const [lastClip, setLastClip] = useState<CaptureClip | null>(null);
 
   // Guard against overlapping recordAttempt calls (worker is single-flight).
   const busyRef = useRef(false);
@@ -230,6 +243,16 @@ export function useCaptureRep(): UseCaptureRepResult {
         const verdict = await evaluateClip(frames, targetGloss);
         if (disposedRef.current) return null;
         setLastVerdict(verdict);
+        // Retain the captured frames so the dev replay button can play them
+        // back (evaluateClip copies/transfers its own buffer, so `frames` is
+        // still intact here).
+        setLastClip({
+          frames,
+          width: frames[0].width,
+          height: frames[0].height,
+          passed: verdict.pass,
+          target: targetGloss,
+        });
         return verdict;
       } catch (err) {
         // eslint-disable-next-line no-console
@@ -258,6 +281,7 @@ export function useCaptureRep(): UseCaptureRepResult {
     phase,
     countdown,
     lastVerdict,
+    lastClip,
     resetVerdict,
     hasGloss,
     recordAttempt,

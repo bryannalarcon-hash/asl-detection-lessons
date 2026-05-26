@@ -10,6 +10,8 @@ interface DevPanelProps {
   onFailRep: () => void;
   cvReadoutOn: boolean;
   onToggleCvReadout: () => void;
+  hasClip: boolean;
+  onReplayClip: () => void;
 }
 
 const BTN =
@@ -24,6 +26,8 @@ export function DevPanel({
   onFailRep,
   cvReadoutOn,
   onToggleCvReadout,
+  hasClip,
+  onReplayClip,
 }: DevPanelProps) {
   if (!isDevToolsEnabled()) return null;
 
@@ -118,6 +122,16 @@ export function DevPanel({
           className={BTN}
         >
           CV readout: {cvReadoutOn ? 'on' : 'off'}
+        </button>
+        <button
+          type="button"
+          data-testid="dev-replay-clip"
+          data-dev-override
+          onClick={onReplayClip}
+          disabled={!hasClip}
+          className={BTN}
+        >
+          {hasClip ? 'Replay my capture' : 'Replay my capture (record one first)'}
         </button>
       </div>
     </aside>

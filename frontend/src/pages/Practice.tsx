@@ -31,6 +31,7 @@ import {
   readCvReadoutPref,
   writeCvReadoutPref,
 } from '@/components/practice/CvReadout';
+import { DevClipReplay } from '@/components/practice/DevClipReplay';
 import { HintButton } from '@/components/practice/HintButton';
 import { type BoxState } from '@/components/practice/BoundingBox';
 import { PracticeHeader } from '@/components/practice/PracticeHeader';
@@ -141,6 +142,8 @@ export default function PracticePage() {
   const [showRetry, setShowRetry] = useState(false);
   // Dev-only CV diagnostics overlay, toggled from the dev panel (persisted).
   const [cvReadoutOn, setCvReadoutOn] = useState(readCvReadoutPref);
+  // Dev-only replay of the learner's last captured attempt.
+  const [replayOpen, setReplayOpen] = useState(false);
   // Bumped once per fresh failed recorded attempt to auto-open the targeted hint.
   const [hintOpenSignal, setHintOpenSignal] = useState(0);
 
@@ -464,6 +467,14 @@ export default function PracticePage() {
               return next;
             })
           }
+          hasClip={!!capture.lastClip}
+          onReplayClip={() => setReplayOpen(true)}
+        />
+
+        <DevClipReplay
+          clip={capture.lastClip}
+          open={replayOpen}
+          onClose={() => setReplayOpen(false)}
         />
 
         {cvReadoutOn && (
