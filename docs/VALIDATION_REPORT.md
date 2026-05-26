@@ -15,7 +15,7 @@ is flagged.
 | Net 2 | Palm detector (deployed: `net2_v3_1`) | AP@0.5 | 0.20 | COCO-WholeBody val (held-out) | Weak; usable only with Net 3 2-pass self-orientation |
 | Net 2-kpt | Palm detector w/ keypoint head (rejected variant) | AP@0.5 | 0.016–0.033 | COCO-WholeBody val (held-out) | Regressed — under-trained, not deployed |
 | Net 3 | Hand landmark regressor | PCK@0.05 / @0.10 / @0.20 | 0.45 / 0.71 / 0.86 | FreiHAND val (held-out) | Best from-scratch result; trails MediaPipe (~0.8) |
-| Net 4 | Sign classifier (~96-word PopSign) | top-1 / top-3 | PENDING | PopSign held-out | Training not complete |
+| Net 4 | Sign classifier (96-word PopSign, 125/word) | top-1 / top-3 | 0.78 / 0.91 | PopSign held-out (n=1156) | Trained; large gain over 40/word baseline |
 
 ## 2. Test conditions
 
@@ -81,19 +81,28 @@ direct-(x,y) regression rewrite. The prior heatmap + soft-argmax net
 diagnosis in `docs/handoffs/HANDOFF_MEDIAPIPE_GAP.md` (the U-Net decoder ate the
 1.3M param budget and occluded joints had no heatmap peak to supervise).
 
-**Net 4 — sign classifier (PENDING).** ~96-word PopSign vocabulary
-(`configs/popsign_vocab.json`; num_classes derived from the sign list at train
-time). Training is not complete; no held-out accuracy exists yet.
+**Net 4 — sign classifier (test top-1 0.778 / top-3 0.913).** 96-word PopSign
+vocabulary, trained on the **125-clip/word** keypoint set: 11,896 clips total
+(3,800 original + 8,096 top-up; `results/v3/net4_kpt_125word/`). Held-out test
+split (n=1156; seed 42, 0.1/0.1 val/test): **top-1 0.778, top-3 0.913** (val
+top-1 0.793 / top-3 0.924). SignClassifier ~1.0M params (Conv1D + Transformer),
+100 epochs on a 3090. Checkpoint `results/v3/net4_popsign_125word/best.pt`.
+
+This is a large gain over the 40/word baseline
+(`results/v3/net4_popsign_baseline40`: test top-1 0.567 / top-3 0.783): the 3.1x
+data increase added ~+0.21 top-1 / +0.13 top-3 and closed the overfit gap — the
+40/word model's val tracked far below its lucky test split, whereas the 125/word
+val ≈ test (0.79 vs 0.78), so the number is trustworthy.
 
 | Net 4 metric | Target | Achieved |
 |--------------|--------|----------|
-| top-1 (constrained, attempted target X) | per `ml-handoff.md`: accept/reject gate at confidence >= 0.85 | PENDING |
-| top-1 (open-vocab, all signs) | report alongside constrained (PopSignAI credibility lesson) | PENDING |
-| top-3 | — | PENDING |
+| top-1 (open-vocab, all 96 signs) | report per `ml-handoff.md` | **0.778** (test, n=1156) |
+| top-3 (open-vocab) | — | **0.913** (test, n=1156) |
+| top-1 (constrained, confidence-gate >= 0.85) | accept/reject gate | PENDING — re-run `scripts/eval_net4_verifier.py` on the new ckpt (baseline40 gave constrained top-1 0.564 / top-3 0.781, verifier accept ~0.6% under-confident) |
 
-To be filled on training completion. `ml-handoff.md` requires publishing BOTH
-the constrained-target number and the open-vocabulary number, not just the
-flattering constrained one.
+`ml-handoff.md` requires publishing BOTH the open-vocab number (above) and the
+constrained-target number; the latter needs `eval_net4_verifier.py` re-pointed
+at `net4_popsign_125word/best.pt` (the script still targets the 40/word ckpt).
 
 ## 4. Known limitations (candid)
 
@@ -134,7 +143,7 @@ flattering constrained one.
 | Net 1 keypoint PCK | usable face/body localization | ~0.72 overall (face 0.78, body 0.66) | Partial — works, off param budget |
 | Net 2 palm AP@0.5 | reliable hand detection | 0.20 (deployed); 0.016 (rejected kpt) | No — weak recall |
 | Net 3 hand PCK@0.05 | approach MediaPipe (~0.8) | 0.45 (was 0.32) | No — improved, still trails |
-| Net 4 sign accuracy | confidence-gate accept/reject (>= 0.85) | PENDING | Pending |
+| Net 4 sign accuracy | confidence-gate accept/reject (>= 0.85) | open-vocab test top-1 0.78 / top-3 0.91 (125/word); constrained gate not yet re-measured | Partial — strong classifier, gate pending |
 | OOD rejection rate | >= 90% | Not implemented / not measured | No |
 | Model bundle size | <= 25MB | Net 1 alone 13.4M params (off budget) | No — needs INT8 + shrink |
 | End-to-end accuracy | composed cascade validated | Not run end-to-end | No |
