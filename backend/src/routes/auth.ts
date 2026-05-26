@@ -1,3 +1,8 @@
+/**
+ * Authentication routes for sign-up, sign-in, dev-login, sign-out, and the
+ * current-user `me` endpoint. Uses bcrypt password hashing with constant-time
+ * comparison and gates the dev-login convenience behind DEV_TOOLS_ENABLED.
+ */
 import { Hono } from 'hono';
 import { eq, sql } from 'drizzle-orm';
 import { z } from 'zod';

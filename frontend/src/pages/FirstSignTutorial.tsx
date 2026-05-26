@@ -1,3 +1,8 @@
+/**
+ * Renders the First-Sign Tutorial onboarding placeholder for UX spec section 9.
+ * It auto-routes to the dashboard after a short pause and offers a manual skip button,
+ * standing in until the tutorial-specific scaffolding is built.
+ */
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PlaceholderLayout } from '@/components/layout/PlaceholderLayout';

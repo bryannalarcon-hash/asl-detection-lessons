@@ -1,3 +1,8 @@
+/**
+ * Right-aligned dashboard indicator that displays the current practice streak
+ * as a large gradient day count. It also shows a pill noting how many streak
+ * freezes remain.
+ */
 import type { StreakStateDto } from '@/lib/api';
 import { Eyebrow } from '@/components/ui/eyebrow';
 

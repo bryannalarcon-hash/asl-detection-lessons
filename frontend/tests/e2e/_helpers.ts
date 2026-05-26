@@ -1,3 +1,8 @@
+/**
+ * Shared Playwright e2e helpers: the dev-bypass sign-in flow and the canonical
+ * 23-route map from the PRD. Imported by the e2e specs so authentication and
+ * route navigation stay consistent across the suite.
+ */
 import type { Page } from '@playwright/test';
 
 /**

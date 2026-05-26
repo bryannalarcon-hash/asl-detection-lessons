@@ -1,3 +1,8 @@
+/**
+ * Renders the lesson-complete celebration screen with session stats, a per-sign
+ * mastery snapshot, and next-lesson / back-to-dashboard CTAs. It derives the next
+ * lesson by orderIndex from the lessons list and pulls streak data from the progress dashboard.
+ */
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { lessonsApi, progressApi } from '@/lib/api';

@@ -1,3 +1,7 @@
+/**
+ * E2E test for the practice hint button's adaptive surfacing. Verifies the hint
+ * stays quiet at zero fails, turns urgent at two or more, and auto-opens at three.
+ */
 import { test, expect } from '@playwright/test';
 import { signInViaDevBypass } from './_helpers';
 

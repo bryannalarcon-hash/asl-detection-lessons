@@ -1,3 +1,8 @@
+/**
+ * Horizontally scrolling strip of recent-lesson cards, each linking to its
+ * lesson and showing a mastered-of-total progress bar. It manages slide
+ * controls and edge fades that appear based on the scroller's scroll position.
+ */
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';

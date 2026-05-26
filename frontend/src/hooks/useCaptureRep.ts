@@ -1,3 +1,9 @@
+/**
+ * Hook owning the in-browser capture-a-rep lifecycle: it initializes the CV
+ * worker, runs a countdown, captures ~3s of webcam frames, culls near-static
+ * frames, and evaluates the clip against a target gloss. It degrades gracefully
+ * to the self-report fallback when WebGPU or the model fetch is unavailable.
+ */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   initCaptureRep,

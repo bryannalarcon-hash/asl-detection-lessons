@@ -1,3 +1,8 @@
+/**
+ * Themed toggle switch wrapping the base-ui switch primitive with accent
+ * checked-state coloring and a sliding thumb. It applies the app's focus-ring
+ * and disabled styling and merges any supplied className.
+ */
 import * as React from 'react';
 import { Switch as SwitchPrimitive } from '@base-ui/react/switch';
 import { cn } from '@/lib/utils';

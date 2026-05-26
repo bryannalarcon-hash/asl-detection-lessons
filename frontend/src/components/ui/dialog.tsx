@@ -1,3 +1,9 @@
+/**
+ * Themed dialog primitives built on the base-ui dialog, exporting a centered
+ * modal popup with backdrop, close button, and layout helpers (DialogHeader,
+ * DialogFooter, DialogTitle, DialogDescription). They provide the standard
+ * modal styling and structure used across the app.
+ */
 import * as React from 'react';
 import { Dialog as DialogPrimitive } from '@base-ui/react/dialog';
 import { X } from 'lucide-react';

@@ -1,3 +1,5 @@
+# Stage 2 v4 config for Net 4 trained on the PopSign-only ASL-1 vocabulary, with the class count derived at runtime from the sign list (model.num_classes is a documentation hint only).
+# Mirrors the base v4 classifier architecture and schedule but points at the PopSign manifest, keypoint cache, and checkpoint prefix.
 run_name: stage2_v4_classifier_popsign_v1
 
 data:

@@ -1,3 +1,7 @@
+/**
+ * Renders the 404 not-found page shown for unmatched routes or bad lesson slugs.
+ * It offers links back to the dashboard and the lessons catalog.
+ */
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 

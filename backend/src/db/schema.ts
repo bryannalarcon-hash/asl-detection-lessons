@@ -1,3 +1,8 @@
+/**
+ * Drizzle schema defining the ASL Pilot Postgres tables, enums, and inferred
+ * row types. Covers users, lessons, signs, drill definitions, rep logs, mastery
+ * state, streaks, and notification preferences for the practice app.
+ */
 import { sql } from 'drizzle-orm';
 import {
   pgTable,

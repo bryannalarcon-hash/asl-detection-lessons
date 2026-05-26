@@ -1,3 +1,5 @@
+# Stage 1 v2 config that trains a slimmed 7-keypoint face+body net (keypoint slice 42-48) for 210 epochs as the Net 1 component of the v3 pipeline.
+# Uses BF16 transfer with channels_last and fused AdamW disabled to avoid the Modal Xid 43 device-side-assert crash seen in earlier runs.
 run_name: stage1_v2_facebody
 
 data:

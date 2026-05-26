@@ -1,3 +1,8 @@
+/**
+ * Renders the email-verification screen with six auto-advancing digit cells that
+ * navigate into onboarding once all are filled. The backend issues no real codes in v1,
+ * so this is a UX placeholder that accepts any six digits and offers a dev mark-verified bypass.
+ */
 import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eyebrow } from '@/components/ui/eyebrow';

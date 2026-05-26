@@ -1,3 +1,5 @@
+# Stage 1 v3 v1 config for the 21-keypoint hand-landmark heatmap net (Net 3), trained 200 epochs at 224px on a weighted 60/30/10 FreiHAND/InterHand/RHD mix with adaptive-wing loss.
+# Caps sampling at 250K items/epoch via a WeightedRandomSampler and evaluates PCK@0.05 on a held-out FreiHAND scene split.
 run_name: stage1_v3_landmark_v1
 
 data:

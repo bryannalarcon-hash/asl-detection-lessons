@@ -1,3 +1,5 @@
+# Stage 1 v3 Phase 1 config for Net 3, the 21-keypoint hand-landmark heatmap net, trained from scratch on FreiHAND + InterHand ground-truth crops at 224px with adaptive-wing loss.
+# Uses ground-truth bboxes only (no Net 2 prediction mixing) to learn clean landmark localization before Phase 2 introduces predicted crops.
 run_name: stage1_v3_landmark_phase1
 
 data:

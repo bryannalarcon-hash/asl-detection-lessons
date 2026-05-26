@@ -1,3 +1,9 @@
+/**
+ * Renders a GitHub-style 75-day practice-activity grid, mapping daily rep
+ * counts into five color-coded intensity tiers laid out by week and day-of-week.
+ * Clicking a cell opens a dialog with that day's lesson detail and pass/fail
+ * outcomes fetched from the progress API.
+ */
 import { useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ExternalLink } from 'lucide-react';

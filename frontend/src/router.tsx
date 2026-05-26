@@ -1,3 +1,8 @@
+/**
+ * Defines the application's React Router route tree, grouping pages under the auth,
+ * onboarding, full-bleed practice, and authenticated app-shell layouts. Dev-only routes
+ * are gated by isDevToolsEnabled so they are dead-code-eliminated from prod bundles.
+ */
 import { createBrowserRouter, type RouteObject } from 'react-router-dom';
 import { isDevToolsEnabled } from '@/lib/env';
 import { AppShell } from '@/components/layout/AppShell';

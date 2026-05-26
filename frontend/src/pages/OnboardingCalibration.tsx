@@ -1,3 +1,8 @@
+/**
+ * Renders onboarding step 3, the camera calibration screen where the user frames
+ * themselves in the live CameraPanel and toggles the mirror preview. Continuing
+ * advances to the first-sign tutorial.
+ */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CameraPanel } from '@/components/practice/CameraPanel';

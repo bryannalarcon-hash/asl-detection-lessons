@@ -1,3 +1,9 @@
+/**
+ * Sticky header bar for the practice screen showing the lesson back link and
+ * sign counter alongside controls to step back a drill or sign, toggle the
+ * camera, pause, and exit. It exposes these actions through callbacks supplied
+ * by the practice screen.
+ */
 import { ChevronLeft, Pause, X as XIcon, Undo2, CornerUpLeft, Video, VideoOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';

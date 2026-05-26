@@ -1,3 +1,8 @@
+/**
+ * Stub page layout for routes that are not yet built, rendering a breadcrumb,
+ * title, and a note pointing to the relevant ux-spec.md section. It accepts
+ * children so dev-bypass buttons can be slotted beneath the placeholder copy.
+ */
 import { type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 

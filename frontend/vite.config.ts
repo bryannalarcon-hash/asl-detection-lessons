@@ -1,3 +1,8 @@
+/**
+ * Vite build and dev-server configuration for the frontend, wiring the React plugin,
+ * PWA manifest and service-worker caching rules, the `@` source alias, and the jsdom
+ * unit-test setup. Caching deliberately bypasses lesson videos, ONNX models, and API calls.
+ */
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';

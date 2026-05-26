@@ -1,3 +1,4 @@
+"""Dataclass-based config schema and YAML loader for the Stage 1 (v1/v2) training pipeline. Defines Data/Model/Train sub-configs shared across the Net 1 keypoint detector, Net 2 palm detector, and Net 3 landmark trainers, plus deep-merge load/dump helpers."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field

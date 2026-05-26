@@ -1,3 +1,8 @@
+/**
+ * Renders onboarding step 1, the welcome screen that sets expectations about the
+ * pilot's scope and on-device privacy. It links forward to camera setup or lets the
+ * user skip straight to the dashboard.
+ */
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 

@@ -1,3 +1,8 @@
+/**
+ * Holds presentational helpers extracted from the Practice page: the
+ * computeContinueLabel function for the advance-button text and the
+ * CameraPanelWrapper that renders the live camera or a graceful unavailable fallback.
+ */
 import { useState } from 'react';
 import { CameraPanel } from '@/components/practice/CameraPanel';
 import { BoundingBox, type BoxState } from '@/components/practice/BoundingBox';

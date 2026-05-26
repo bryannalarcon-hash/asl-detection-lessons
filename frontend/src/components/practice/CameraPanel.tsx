@@ -1,3 +1,9 @@
+/**
+ * Live 4:3 camera cell that owns a camera-permission instance, wires the granted
+ * stream to a video element, and renders idle, denied, and unsupported states
+ * inline within a state-colored bounding box. It exposes the video element to a
+ * capture hook and supports pausing by disabling tracks to avoid re-prompting.
+ */
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { BoundingBox, type BoxState } from './BoundingBox';

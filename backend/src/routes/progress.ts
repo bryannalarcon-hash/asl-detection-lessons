@@ -1,3 +1,8 @@
+/**
+ * Practice-progress routes that log reps, advance the mastery state machine,
+ * track daily streaks, and serve the dashboard, per-day detail, and lesson
+ * reset. Drives the mastery summary, 75-day heatmap, and recent-lessons views.
+ */
 import { Hono } from 'hono';
 import { and, desc, eq, inArray, max, sql } from 'drizzle-orm';
 import { z } from 'zod';

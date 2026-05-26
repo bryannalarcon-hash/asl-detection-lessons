@@ -1,3 +1,8 @@
+/**
+ * Renders the dev-only Lesson Config editor for overriding which signs a lesson
+ * contains and each stage's clip trim and rep count, persisting overlays to localStorage.
+ * The whole page is gated by isDevToolsEnabled so it is dead-code-eliminated from prod bundles.
+ */
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Navigate } from 'react-router-dom';

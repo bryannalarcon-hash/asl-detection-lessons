@@ -1,3 +1,8 @@
+/**
+ * Course-progress card showing how many signs are in progress out of the total
+ * as a gradient-filled progress bar. It surfaces the "X / 75" metric used by
+ * the dashboard's overall course-progress badge.
+ */
 import { Progress } from '@/components/ui/progress';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { TOTAL_SIGNS } from '@/lib/constants';

@@ -1,3 +1,8 @@
+/**
+ * Health-check route exposing GET /api/health. Returns a liveness flag plus a
+ * `dbReachable` boolean from a Postgres ping guarded by a 500ms timeout so a
+ * downed database does not stall the endpoint.
+ */
 import { Hono } from 'hono';
 import { sql as dbSql } from '../db/client';
 

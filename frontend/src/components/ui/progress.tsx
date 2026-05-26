@@ -1,3 +1,8 @@
+/**
+ * Themed progress bar built on the base-ui progress primitive, rendering a
+ * deep-well track with a cyan-to-violet gradient fill indicator. It accepts
+ * value and max plus optional class overrides for the root, track, and indicator.
+ */
 import * as React from 'react';
 import { Progress as ProgressPrimitive } from '@base-ui/react/progress';
 import { cn } from '@/lib/utils';

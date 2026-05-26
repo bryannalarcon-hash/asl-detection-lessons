@@ -1,3 +1,5 @@
+# Stage 1 v3.1 finetune config for the 7-keypoint face+body Net 1, resuming from the v3 best.pt for 60 epochs on a 70/30 COCO-WholeBody + MPII mix at a 5x-reduced learning rate.
+# Adds MPII via the target_mix sampler to broaden body-pose coverage, keeping the v3 BF16 settings (channels_last and fused AdamW off).
 run_name: stage1_v2_facebody_v3_1
 
 data:

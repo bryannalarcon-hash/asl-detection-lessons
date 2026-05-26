@@ -1,3 +1,8 @@
+/**
+ * Renders the forgot-password screen where a user requests a reset link by email.
+ * Submission swaps the form for an inline confirmation panel rather than navigating away,
+ * and a dev skip button bypasses the absent v1 auth backend straight to the dashboard.
+ */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';

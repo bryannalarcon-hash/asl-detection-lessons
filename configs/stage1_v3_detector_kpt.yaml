@@ -1,3 +1,5 @@
+# Stage 1 v3 config for the Net 2 palm detector with per-anchor keypoint regression (2 kpts/palm) over a multi-stride mini-FPN, trained at 256px on a balanced COCO/HaGRID/EgoHands/FreiHAND/synthetic mix.
+# Runs a two-stage curriculum (HaGRID-only pretrain, then balanced finetune) with focal gamma 4.0 and capped samples per epoch to support the numpy keypoint-target matcher.
 run_name: stage1_v3_detector_kpt
 
 data:

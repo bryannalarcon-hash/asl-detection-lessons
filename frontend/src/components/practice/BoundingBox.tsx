@@ -1,3 +1,9 @@
+/**
+ * Colored bounding-box overlay that frames the camera feed and signals
+ * recognition state through its border color. Gray means no hands, orange means
+ * hands detected while recording, green means the target sign was recognized,
+ * and red means the attempt failed.
+ */
 import { cn } from '@/lib/utils';
 import type { ReactNode } from 'react';
 

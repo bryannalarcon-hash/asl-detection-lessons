@@ -1,3 +1,8 @@
+/**
+ * Lesson catalog routes serving the ordered lesson list and individual lesson
+ * detail. Each lesson detail returns its ordered signs and their drill
+ * definitions, with live sign counts re-aggregated from the sign table.
+ */
 import { Hono } from 'hono';
 import { asc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '../db/client';

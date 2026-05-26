@@ -1,3 +1,8 @@
+/**
+ * Builds the PracticeSign list the practice machine consumes, collapsing each
+ * backend sign to a single full-sign drill. Also applies a dev Lesson Config overlay,
+ * letting it redefine the sign set, order, per-stage reps, and reference-clip trim.
+ */
 import type { PracticeSign } from '@/lib/machines/practice';
 import { isAutoSegment, type LessonConfig } from '@/lib/lesson-config';
 import type { DrillType } from '@/cv/types';

@@ -1,3 +1,5 @@
+# Stage 1 v3.1 config for the box-only Net 2 palm detector over a multi-stride mini-FPN at 256px, on the balanced COCO/HaGRID/EgoHands/FreiHAND/synthetic mix.
+# Differs from the kpt variant by dropping keypoint regression (focal gamma 2.0) and lengthening the two-stage curriculum to 40 + 30 epochs.
 run_name: stage1_v3_detector_v3_1
 
 data:

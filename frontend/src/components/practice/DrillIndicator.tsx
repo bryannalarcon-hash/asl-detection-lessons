@@ -1,3 +1,8 @@
+/**
+ * Three-stage pill tab row showing progress through a sign's drills (handshape,
+ * movement, whole-sign). Each pill is styled as done, active, or upcoming based
+ * on its position relative to the current drill, with a checkmark on completed stages.
+ */
 import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DrillType } from '@/cv/types';

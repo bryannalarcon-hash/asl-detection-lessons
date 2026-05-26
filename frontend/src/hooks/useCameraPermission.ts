@@ -1,3 +1,9 @@
+/**
+ * Hook owning the camera-permission lifecycle as a state machine (idle,
+ * requesting, granted, denied, unsupported), managing getUserMedia and stream
+ * teardown per consumer instance. It supports dev-only forced states with a
+ * synthetic canvas stream and auto-recovers via the Permissions API after a reset.
+ */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isDevToolsEnabled } from '@/lib/env';
 

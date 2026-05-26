@@ -1,3 +1,8 @@
+/**
+ * Renders the camera-blocked recovery screen shown when getUserMedia is denied.
+ * It detects the browser to give targeted re-enable instructions, offers a retry that
+ * re-requests camera access, and lets the user continue to the dashboard without a camera.
+ */
 import { useNavigate } from 'react-router-dom';
 import { CameraOff, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';

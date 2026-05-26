@@ -1,3 +1,8 @@
+/**
+ * Renders the lesson intro screen: the lesson's sign list plus a practice-settings
+ * panel for the camera and reference-video toggles, a start-practice CTA, and a
+ * progress reset. It seeds toggle defaults from App Settings and passes the chosen options to the practice route.
+ */
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';

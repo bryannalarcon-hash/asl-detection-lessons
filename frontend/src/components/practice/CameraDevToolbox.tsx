@@ -1,3 +1,8 @@
+/**
+ * Dev-only toolbox of buttons that force the camera-permission state to
+ * granted, denied, unsupported, or reset for testing the camera UI. It renders
+ * nothing unless dev tools are enabled.
+ */
 import { isDevToolsEnabled } from '@/lib/env';
 import type { UseCameraPermissionResult } from '@/hooks/useCameraPermission';
 

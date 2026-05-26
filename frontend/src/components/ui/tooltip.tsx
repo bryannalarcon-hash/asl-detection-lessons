@@ -1,3 +1,8 @@
+/**
+ * Themed tooltip primitives built on the base-ui tooltip, exporting the
+ * provider, root, trigger, and a styled positioned popup content. They provide
+ * the standard tooltip styling and portal-based positioning used across the app.
+ */
 import * as React from 'react';
 import { Tooltip as TooltipPrimitive } from '@base-ui/react/tooltip';
 import { cn } from '@/lib/utils';

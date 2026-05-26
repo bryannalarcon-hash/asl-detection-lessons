@@ -1,3 +1,8 @@
+/**
+ * Renders the App Settings page where the user toggles practice defaults (camera,
+ * reference video, reduced motion, mirror) and playback options. Changes flow through
+ * useAppSettings and persist to localStorage, prefilling the Lesson Intro toggles.
+ */
 import { useAppSettings } from '@/lib/settings';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';

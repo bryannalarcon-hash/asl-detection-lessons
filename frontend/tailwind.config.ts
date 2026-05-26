@@ -1,3 +1,8 @@
+/**
+ * Tailwind CSS configuration that maps the Foundry Aurora design tokens (CSS
+ * variables from styles/globals.css) into colors, radii, fonts, gradients, and shadows.
+ * It enables class-based dark mode and includes shadcn-compatible aliases and the animate plugin.
+ */
 import type { Config } from 'tailwindcss';
 import animate from 'tailwindcss-animate';
 

@@ -1,3 +1,8 @@
+/**
+ * Renders onboarding step 2, the camera permission request screen. It drives the
+ * getUserMedia prompt via useCameraPermission, advancing to calibration on grant and
+ * to the camera-denied page on denial, with a dev toolbox for forcing permission states.
+ */
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';

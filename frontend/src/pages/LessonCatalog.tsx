@@ -1,3 +1,8 @@
+/**
+ * Renders the lessons catalog: a searchable, category-filterable list of lessons
+ * fetched from the lessons API, each linking to its detail page. It falls back to a
+ * fixed category list and an empty-state message when the backend is unreachable.
+ */
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';

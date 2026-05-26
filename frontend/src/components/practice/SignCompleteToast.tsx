@@ -1,3 +1,7 @@
+/**
+ * Non-blocking bottom-right toast announcing that a sign has been completed and
+ * saved. It auto-dismisses after a few seconds and can also be closed manually.
+ */
 import { useEffect } from 'react';
 import { Sparkles, X as XIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';

@@ -1,3 +1,8 @@
+/**
+ * Renders the sign-in screen with a zod-validated email/password form that
+ * authenticates via useSignIn and routes to the dashboard. It preloads the in-browser
+ * CV engine while the user types and exposes the seeded dev credentials and skip-login when dev tools are on.
+ */
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';

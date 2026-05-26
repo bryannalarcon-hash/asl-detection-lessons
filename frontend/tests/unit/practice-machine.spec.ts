@@ -1,3 +1,8 @@
+/**
+ * Unit test for the XState practiceMachine that drives the lesson practice loop.
+ * Exercises the state transitions for advancing reps and signs through a
+ * single-drill-per-sign lesson plan.
+ */
 import { describe, it, expect } from 'vitest';
 import { createActor } from 'xstate';
 import { practiceMachine, type PracticeSign } from '@/lib/machines/practice';

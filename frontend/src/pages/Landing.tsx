@@ -1,3 +1,8 @@
+/**
+ * Renders the public landing page: a marketing hero pitching camera-based ASL
+ * practice, value-prop highlights, sign-in/sign-up CTAs, and a footer of legal links.
+ * It is the unauthenticated entry point to the app.
+ */
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Eyebrow } from '@/components/ui/eyebrow';

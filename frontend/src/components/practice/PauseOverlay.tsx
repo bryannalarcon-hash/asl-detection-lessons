@@ -1,3 +1,8 @@
+/**
+ * Full-screen pause modal for the practice session offering Resume and Exit
+ * actions. Resume continues the practice loop where it left off, while Exit
+ * returns to the lesson intro.
+ */
 import { Play, X as XIcon } from 'lucide-react';
 
 interface PauseOverlayProps {

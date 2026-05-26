@@ -1,3 +1,4 @@
+"""Global random-seed utility that seeds Python, NumPy, and PyTorch (CPU and CUDA) for reproducible training runs. Used across the CV pipeline trainers to make data shuffling and weight initialization deterministic."""
 from __future__ import annotations
 
 import os

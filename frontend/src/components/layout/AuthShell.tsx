@@ -1,3 +1,8 @@
+/**
+ * Minimal layout for unauthenticated auth screens, showing only a centered
+ * brand logo header above the routed content. It centers its Outlet for the
+ * sign-in and related auth pages.
+ */
 import { Link, Outlet } from 'react-router-dom';
 import { BrandMark } from '@/components/ui/brand-mark';
 import { Wordmark } from '@/components/ui/wordmark';

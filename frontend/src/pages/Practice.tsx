@@ -1,3 +1,9 @@
+/**
+ * Renders the core practice screen that drives a lesson through the XState practice
+ * machine, wiring the camera panel, reference video, rep capture, self-report controls,
+ * hints, and resume persistence. It builds its sign list from backend data (or a fallback)
+ * with optional dev Lesson Config overlays and gates the dev tooling behind isDevToolsEnabled.
+ */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMachine } from '@xstate/react';

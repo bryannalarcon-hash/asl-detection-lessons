@@ -1,3 +1,8 @@
+/**
+ * Themed text input that forwards a ref and applies the app's border, surface,
+ * and focus-ring styling. It defaults the input type to text and merges any
+ * supplied className.
+ */
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 

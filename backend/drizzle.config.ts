@@ -1,3 +1,8 @@
+/**
+ * Drizzle Kit configuration for the ASL Pilot Postgres database. Points the
+ * migration tooling at the schema in src/db/schema.ts and the migrations output
+ * folder, using DATABASE_URL (or the local dev fallback) for connection.
+ */
 import 'dotenv/config';
 import type { Config } from 'drizzle-kit';
 

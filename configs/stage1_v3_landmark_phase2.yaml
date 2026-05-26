@@ -1,3 +1,5 @@
+# Stage 1 v3 Phase 2 config for Net 3, a short 10-epoch low-LR finetune of the 21-keypoint hand-landmark net resuming from the Phase 1 best.pt.
+# Mixes Net 2's predicted bboxes (phase2_mix_prob 0.5) with reduced jitter so the landmark net adapts to the sloppier crops it will see at inference.
 run_name: stage1_v3_landmark_phase2
 
 data:

@@ -1,3 +1,9 @@
+/**
+ * Set of composable card primitives (Card, CardHeader, CardTitle,
+ * CardDescription, CardContent, CardFooter) styled with the app's surface,
+ * border, and spacing tokens. They provide the standard bordered panel layout
+ * used across the UI.
+ */
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 

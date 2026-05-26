@@ -1,3 +1,5 @@
+# Stage 1 v3 config for the regression-head variant of Net 3, predicting 21 hand keypoints as direct coordinates (no heatmaps) at 224px on a 60/30/10 FreiHAND/InterHand/RHD mix.
+# Canonicalizes crop rotation upright (replacing v2's broken full-rotation aug) and applies fingertip-weighted smooth-L1 loss with z and presence heads disabled.
 run_name: stage1_v3_landmark_reg
 
 data:

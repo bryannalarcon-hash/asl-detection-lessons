@@ -1,3 +1,8 @@
+/**
+ * Renders the account-creation screen with a zod-validated form (display name, email,
+ * password with confirmation) that registers via useSignUp and routes into onboarding.
+ * It preloads the in-browser CV engine while the user types and offers a dev skip-sign-up shortcut.
+ */
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';

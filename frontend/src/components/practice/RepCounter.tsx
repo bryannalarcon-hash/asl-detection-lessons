@@ -1,3 +1,8 @@
+/**
+ * Rep counter for the practice title row, displaying the current rep and total
+ * as an "X / N" numerator. The current digit is rendered with a gradient text
+ * fill to draw focus to progress within the drill.
+ */
 interface RepCounterProps {
   current: number; // 0-indexed
   total: number;

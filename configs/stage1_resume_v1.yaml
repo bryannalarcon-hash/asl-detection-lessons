@@ -1,3 +1,5 @@
+# Stage 1 config that mirrors the original v1 hyperparameters exactly so training can resume from the v1_best.pt checkpoint without architecture or data drift.
+# Identical 49-keypoint setup to the baseline, differing only in writing checkpoints to stage1_resumed and pinning the COCO image split keys.
 run_name: stage1_resume_v1
 
 # This config matches the v1 training exactly so we can resume from v1_best.pt.

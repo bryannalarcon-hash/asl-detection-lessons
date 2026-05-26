@@ -1,3 +1,5 @@
+# Stage 1 v3 v2 config for the 21-keypoint hand-landmark heatmap net (Net 3), upgrading v1 with U-Net skip connections, sharper heatmaps, fingertip-weighted loss, and full-rotation augmentation.
+# Adds SWA over the final 20 epochs and multi-threshold PCK logging (0.05/0.10/0.20) on the held-out FreiHAND split.
 run_name: stage1_v3_landmark_v2
 
 data:

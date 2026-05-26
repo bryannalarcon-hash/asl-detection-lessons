@@ -1,3 +1,9 @@
+/**
+ * Dev-only button that signs in via the dev-login mutation and navigates to a
+ * target route, bypassing the real auth flow. It renders nothing unless dev
+ * tools are enabled, and falls through to the destination even if the backend
+ * is unreachable.
+ */
 import { useNavigate } from 'react-router-dom';
 import { useDevLogin } from '@/lib/auth';
 import { isDevToolsEnabled } from '@/lib/env';

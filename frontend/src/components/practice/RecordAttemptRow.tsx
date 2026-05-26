@@ -1,3 +1,9 @@
+/**
+ * Record-attempt control that captures a short clip and runs the on-device CV
+ * cascade to verify the sign, labeling its button by capture phase (countdown,
+ * recording, evaluating). It is the camera-based counterpart to the manual
+ * self-report row and renders only when the capture hook is ready.
+ */
 import { cn } from '@/lib/utils';
 import type { CapturePhase } from '@/hooks/useCaptureRep';
 

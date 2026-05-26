@@ -1,3 +1,9 @@
+/**
+ * Reference-clip player that loads a sign's video and plays only the segment for
+ * the active drill (handshape, movement, or whole-sign), with controls for
+ * play/pause, replay, auto-loop, and slow-motion. It supports dev-config clip
+ * and trim-range overrides and falls back to a mock clip on load error.
+ */
 import { useEffect, useRef, useState } from 'react';
 import { Play, RotateCcw, Repeat, Square } from 'lucide-react';
 import { MOCK_REFERENCE_VIDEO_URL } from '@/lib/constants';

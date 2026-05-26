@@ -1,3 +1,9 @@
+/**
+ * Hint trigger and dialog for the practice screen that surfaces a targeted cue
+ * from the last failed attempt or a default word cue, alongside a reference
+ * video. Its visual urgency scales with the miss count, and it auto-opens once
+ * per sign after enough failures.
+ */
 import { useEffect, useRef, useState } from 'react';
 import { HelpCircle } from 'lucide-react';
 import {

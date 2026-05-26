@@ -1,3 +1,8 @@
+/**
+ * Backend entry point: builds the Hono app, wires CORS plus the health, auth,
+ * lessons, progress, and seed-asset API routes, and serves runtime assets and
+ * the built SPA. Verifies migrations are applied before binding the HTTP server.
+ */
 import 'dotenv/config';
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';

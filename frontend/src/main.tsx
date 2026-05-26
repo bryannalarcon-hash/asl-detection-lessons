@@ -1,3 +1,7 @@
+/**
+ * Client entry point that boots the React application. It mounts the App into the
+ * #root element under StrictMode and imports the global stylesheet.
+ */
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';

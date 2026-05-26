@@ -1,3 +1,8 @@
+/**
+ * Themed form label that forwards a ref and applies consistent text styling,
+ * dimming when its associated peer control is disabled. It merges any supplied
+ * className over the defaults.
+ */
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 

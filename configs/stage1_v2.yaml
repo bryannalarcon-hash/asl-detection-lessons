@@ -1,3 +1,5 @@
+# Stage 1 v2 config for the full-length 49-keypoint whole-body heatmap net, extending the baseline to 210 epochs with higher early-stop patience on the same 70/30 COCO-WholeBody + FreiHAND mix.
+# The longer schedule is the main change from v1, aiming to push PCK further before later face/body slicing experiments.
 run_name: stage1_v2
 
 data:

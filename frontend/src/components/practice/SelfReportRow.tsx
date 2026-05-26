@@ -1,3 +1,8 @@
+/**
+ * Manual continue/skip CTA row for the practice screen, recording the chosen
+ * outcome against the progress API before advancing. It is the manual fallback
+ * to CV-based detection, letting the learner self-report a pass or skip the sign.
+ */
 import { progressApi } from '@/lib/api';
 import type { DrillType } from '@/cv/types';
 import { cn } from '@/lib/utils';

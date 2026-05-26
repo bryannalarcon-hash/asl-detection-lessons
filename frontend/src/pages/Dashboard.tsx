@@ -1,3 +1,8 @@
+/**
+ * Renders the learner dashboard: a welcome hero, mastery progress card, recent
+ * lessons, and a practice-activity heatmap. It pulls live stats from the progress
+ * dashboard query (refetching on every visit) and falls back to placeholder figures while loading.
+ */
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight } from 'lucide-react';

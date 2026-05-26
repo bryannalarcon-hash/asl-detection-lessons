@@ -1,3 +1,5 @@
+# Fast smoke-test config for the Stage 1 49-keypoint heatmap net, using a tiny batch (8), 2 epochs, 384px input, and disabled early stopping to exercise the full pipeline end to end.
+# Intended for verifying the training loop runs without crashing, not for producing a usable model.
 run_name: stage1_smoke
 
 data:

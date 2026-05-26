@@ -1,3 +1,9 @@
+/**
+ * Per-sign trim card for the dev Lesson Config editor, embedding the sign's
+ * reference clip with a scrubber and a row per stage (handshape, movement,
+ * whole-sign) for setting trim ranges and reps. Each stage can capture the
+ * current playhead and preview by looping the clip within just that stage's range.
+ */
 import { useEffect, useRef, useState } from 'react';
 import { MOCK_REFERENCE_VIDEO_URL } from '@/lib/constants';
 import {

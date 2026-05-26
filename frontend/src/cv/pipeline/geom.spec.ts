@@ -1,3 +1,10 @@
+/**
+ * Unit tests for the pure geometry/image-glue helpers in geom.ts: letterbox,
+ * resizeArea, softArgmax2d, box/keypoint decode, NMS, upright rotation, affine
+ * crop/project round-trips, bilinear warp, box expansion, plus the anchor
+ * generators. Pins the math that must stay numerically faithful to the Python
+ * Stage-1 extractor so the cascade reproduces the offline keypoints.
+ */
 import { describe, it, expect } from 'vitest';
 import {
   type RGBImage,

@@ -1,3 +1,5 @@
+# Stage 1 v3 config for Net 2, the SSD-style palm detector, trained at 192px on COCO-WholeBody + FreiHAND + HaGRID via a pre-decoded letterboxed image cache.
+# Uses 3 square anchors per cell with focal + smooth-L1 box loss and EMA, producing the box-only detector before keypoint regression was added.
 run_name: stage1_v3_detector
 
 data:

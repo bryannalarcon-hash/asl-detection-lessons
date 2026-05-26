@@ -1,3 +1,9 @@
+/**
+ * Dev-only control panel for the practice screen that exposes buttons to mock
+ * CV outcomes: force the bounding-box color, skip drills, auto-pass or fail a
+ * rep, toggle the CV readout, and replay the last capture. It renders nothing
+ * unless dev tools are enabled.
+ */
 import { isDevToolsEnabled } from '@/lib/env';
 import { __devSetBoxState } from '@/cv/evaluate';
 

@@ -1,3 +1,8 @@
+/**
+ * Themed Checkbox wrapping the base-ui checkbox primitive with the app's border,
+ * focus-ring, and checked-state accent styling. It shows a check icon in its
+ * indicator when checked.
+ */
 import * as React from 'react';
 import { Checkbox as CheckboxPrimitive } from '@base-ui/react/checkbox';
 import { Check } from 'lucide-react';

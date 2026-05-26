@@ -1,3 +1,5 @@
+# Baseline Stage 1 v1 config for the 49-keypoint whole-body heatmap net, trained on a 70/30 COCO-WholeBody + FreiHAND mix at 256px input / 64px heatmaps.
+# Serves as the original from-scratch reference run (50 epochs, batch 128) against which later v2 and v3 variants are compared.
 run_name: stage1_baseline
 
 data:

@@ -1,3 +1,5 @@
+# Stage 2 v4 config for Net 4, the 75-class sign classifier over keypoint-sequence features (max 64 frames, with visibility and lag1/lag2 deltas) read from the .npz keypoint cache.
+# Defines the 1D-conv classifier (dim 192, kernel 17) with drop-path and late dropout, trained 100 epochs with label smoothing and top-1/top-3 eval.
 run_name: stage2_v4_classifier_v1
 
 data:

@@ -1,3 +1,8 @@
+/**
+ * Authenticated app layout providing the sticky top nav (logo, primary links,
+ * and user menu) and an Outlet for the routed page below it. It exposes sign-out
+ * and reflects the current user, falling back to a sign-in link when absent.
+ */
 import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { useUser, useSignOut } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
