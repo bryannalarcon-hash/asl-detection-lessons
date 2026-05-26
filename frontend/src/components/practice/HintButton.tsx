@@ -117,7 +117,11 @@ export function HintButton({
           )}
         </DialogHeader>
         <div className="mt-4 aspect-video w-full">
-          <ReferenceVideo signSlug={signSlug} englishGloss={englishGloss} />
+          <ReferenceVideo
+            signSlug={signSlug}
+            englishGloss={englishGloss}
+            drillType="sign"
+          />
         </div>
       </DialogContent>
     </Dialog>

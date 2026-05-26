@@ -24,7 +24,7 @@ export function diagnoseAttempt(
   if (handsFraction < MIN_HANDS_FRACTION) {
     return {
       parameter: 'framing',
-      hint: 'Keep both hands in view for the whole sign — center yourself so nothing leaves the frame.',
+      hint: 'Keep your signing hand in the camera frame for the whole sign — center yourself so it does not leave the view.',
     };
   }
 
