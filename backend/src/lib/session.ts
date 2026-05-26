@@ -16,11 +16,16 @@ export const SESSION_COOKIE_NAME = 'asl_session';
 
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // 30 days
 
+// Secure cookie over HTTPS in prod (Railway serves HTTPS); plain http in local
+// dev. Driven by NODE_ENV so the local flow keeps working without HTTPS.
+const COOKIE_SECURE =
+  process.env.COOKIE_SECURE === '1' || process.env.NODE_ENV === 'production';
+
 export function setSession(c: Context, userId: string): void {
   setCookie(c, SESSION_COOKIE_NAME, userId, {
     httpOnly: true,
     sameSite: 'Lax',
-    secure: false, // dev only — set true behind HTTPS in prod
+    secure: COOKIE_SECURE,
     path: '/',
     maxAge: COOKIE_MAX_AGE_SECONDS,
   });

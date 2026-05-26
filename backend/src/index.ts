@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
+import { serveStatic } from '@hono/node-server/serve-static';
 import { sql as dbSql } from './db/client';
 import { corsMiddleware } from './lib/cors';
 import healthRoutes from './routes/health';
@@ -16,6 +17,15 @@ app.route('/api/health', healthRoutes);
 app.route('/api/auth', authRoutes);
 app.route('/api/lessons', lessonsRoutes);
 app.route('/api/progress', progressRoutes);
+
+// Serve the built SPA (frontend/dist) for everything non-/api. In single-service
+// deploys (Railway) this hosts the app + API under one origin; in local dev the
+// dist is absent and these no-op (the frontend runs on Vite). STATIC_ROOT lets
+// the deploy point at the build output.
+const STATIC_ROOT = process.env.STATIC_ROOT ?? 'frontend/dist';
+app.use('/*', serveStatic({ root: STATIC_ROOT }));
+// SPA fallback: unmatched non-file routes return index.html for client routing.
+app.get('/*', serveStatic({ path: `${STATIC_ROOT}/index.html` }));
 
 /**
  * Boot-time safety: refuse to start if migrations haven't been applied.
@@ -59,7 +69,8 @@ async function ensureMigrationsApplied(): Promise<void> {
   }
 }
 
-const port = Number(process.env.BACKEND_PORT ?? 3000);
+// Railway (and most PaaS) inject PORT; fall back to BACKEND_PORT then 3000.
+const port = Number(process.env.PORT ?? process.env.BACKEND_PORT ?? 3000);
 
 await ensureMigrationsApplied();
 

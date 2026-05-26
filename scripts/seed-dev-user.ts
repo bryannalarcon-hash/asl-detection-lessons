@@ -828,6 +828,16 @@ export async function runSeed(): Promise<{
     console.log('[seed] --reset-dev-account flag detected (default behaviour anyway)');
   }
 
+  // Boot-time seeding (deploy): only seed when the catalog is empty, so a
+  // container restart never re-runs the seed and wipes real signups.
+  if (process.env.SEED_IF_EMPTY === '1') {
+    const existing = await db.select({ id: lesson.id }).from(lesson).limit(1);
+    if (existing.length > 0) {
+      console.log('[seed] SEED_IF_EMPTY=1 and catalog already present — skipping.');
+      return { lessons: 0, signs: 0, drills: 0, masteryRows: 0, repLogRows: 0 };
+    }
+  }
+
   console.log('[seed] upserting catalog...');
   const { lessonIdBySlug, signIdByGlobalIdx, drillCount } = await upsertCatalog();
   console.log(`[seed]   ${lessonIdBySlug.size} lessons, ${signIdByGlobalIdx.size} signs, ${drillCount} drill definitions`);
