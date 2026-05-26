@@ -34,7 +34,7 @@ NET4_CKPT = REPO_ROOT / "results/v3/net4_popsign_125word/best.pt"
 KPT_DIR = REPO_ROOT / "results/v3/net4_kpt_125word/popsign_kpt_cache"
 VOCAB = REPO_ROOT / "configs/popsign_vocab.json"
 SEED = 42
-STRIDES = [1, 2, 4, 8]
+STRIDES = [1, 2, 4, 8, 16, 32]
 BODY_FACE = slice(42, 49)  # Net1 slots (RIGHT/LEFT hands occupy 0..41)
 
 
