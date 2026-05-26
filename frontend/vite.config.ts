@@ -22,7 +22,11 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globIgnores: ['**/*.mp4', '**/*.webm', '**/*.onnx'],
+        // Never precache large runtime-fetched assets: lesson videos, ONNX
+        // models, and the ORT wasm runtime (the 23.7MB asyncify wasm exceeds
+        // the 2MB workbox precache limit and fails the build otherwise).
+        globIgnores: ['**/*.mp4', '**/*.webm', '**/*.onnx', '**/*.wasm'],
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         runtimeCaching: [
           {
             urlPattern: /\/videos\/.*\.mp4$/,
