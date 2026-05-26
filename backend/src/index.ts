@@ -31,8 +31,25 @@ app.route('/api/_seed', seedAssetsRoutes);
 // to the SPA static below. Unset locally, where they sit in frontend/public.
 const ASSETS_DIR = process.env.ASSETS_DIR;
 if (ASSETS_DIR) {
-  app.use('/models/*', serveStatic({ root: ASSETS_DIR }));
-  app.use('/videos/*', serveStatic({ root: ASSETS_DIR }));
+  // Set caching headers so the browser reuses these large files across replays
+  // and revisits instead of re-fetching every time (the service worker treats
+  // /videos as NetworkOnly, so the HTTP cache is the only client-side cache).
+  // Models are effectively immutable per filename; videos refresh daily but
+  // serve stale-while-revalidate so playback never blocks on a re-download.
+  const cacheHeader =
+    (value: string) => (_path: string, c: { header: (k: string, v: string) => void }) =>
+      c.header('Cache-Control', value);
+  app.use(
+    '/models/*',
+    serveStatic({ root: ASSETS_DIR, onFound: cacheHeader('public, max-age=2592000') })
+  );
+  app.use(
+    '/videos/*',
+    serveStatic({
+      root: ASSETS_DIR,
+      onFound: cacheHeader('public, max-age=86400, stale-while-revalidate=604800'),
+    })
+  );
 }
 
 // Serve the built SPA (frontend/dist) for everything non-/api. In single-service
