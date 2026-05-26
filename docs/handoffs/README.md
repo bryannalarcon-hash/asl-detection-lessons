@@ -7,10 +7,11 @@ Session resume points. Active handoffs live here; superseded ones are in
 
 The app is **deployed + live on Railway** (https://asl-pilot-api-production.up.railway.app):
 SPA + API + Postgres + auth + lessons catalog + dashboard all work; the real
-capture-rep CV + hint system are wired into the practice flow. Two open issues:
-prod doesn't serve the gitignored CV models + reference videos (excluded from
-`railway up`; nyan fallback + CV disabled on prod), and the camera self-view
-doesn't appear on the deployed site. Net 4 is the 125/word model (test
+capture-rep CV + hint system are wired into the practice flow. **Prod now serves
+the CV models + reference videos from a mounted volume** (the earlier "missing
+assets" was actually a `.railwayignore` unanchored-pattern build bug, now fixed).
+**One open issue:** the camera self-view doesn't appear on the deployed site
+(needs the user's browser console to diagnose). Net 4 is the 125/word model (test
 top-1 0.78 / top-3 0.91). **Start at `HANDOFF_DEPLOY.md`.**
 
 ## Prior state (2026-05-25)

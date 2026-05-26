@@ -29,40 +29,46 @@ SPA loads; `/api/health` → `{ok:true,dbReachable:true}`; Postgres connected;
 lessons catalog seeded (12 lessons / 96 signs, real signCounts); dashboard.
 `[Dev: Skip login]` → seeded Dev User demo, like the youtube demo.
 
-### What does NOT work on prod (the open issue)
-**`/models/*.onnx` and `/videos/lessons/*.mp4` return `index.html`** (the SPA
-fallback) — they're never in `dist`. Root cause: those assets are **gitignored**
-and `railway up` excludes gitignored paths. `--no-gitignore` + a `.railwayignore`
-did NOT include them (the prod vite build runs in ~5s = no large public assets
-copied), and the full ~700MB upload hits **413 Payload Too Large**. Consequences:
-- In-browser CV is disabled on prod (worker fetches net1.onnx → gets HTML → ORT
-  parse error → `notReady` → no Record button).
-- Reference videos show the **nyan-cat mock** (real clip 404 → onError fallback).
+### Prod assets — RESOLVED (2026-05-26, Railway Volume)
+`/models/*.onnx` and `/videos/lessons/*.mp4` now serve from a **mounted volume**
+(verified: `net4.onnx` → `application/octet-stream`, `net1.onnx` full 53,515,044
+bytes, `dad.mp4` → `video/mp4`). In-browser CV + real reference clips work on prod.
+
+**The real root cause was a build bug, not the assets.** `.railwayignore` had
+**unanchored** dir patterns (`src`, `tools`, `tests`, …) which in gitignore syntax
+match at ANY depth — so `railway up` was stripping `frontend/src`/`backend/src`
+from the upload. Every deploy after the volume was attached then failed at the
+**build** step (`Rollup failed to resolve /src/main.tsx`), which is why the
+failed deployments had **empty deploy logs** (they never reached the run step).
+Fix: anchor every repo-root dir with a leading slash (`f2be396`). The volume was
+fine all along.
 
 ---
 
-## 2. NEXT STEPS — get the prod assets served (priority)
+## 2. How prod assets are served (the volume setup)
 
-The gitignored large assets (`frontend/public/models/*.onnx` ~93MB,
-`frontend/public/videos/lessons/*.mp4` ~578MB) must reach the deployed image.
-`railway up` can't carry them (gitignore-excluded + 413 over ~hundreds of MB).
-Options, recommended order:
+- **Volume** `asl-pilot-api-volume` (`7c141e55-…`), mounted at **`/data`** on
+  `asl-pilot-api`. Env **`ASSETS_DIR=/data/assets`**.
+- Backend (`backend/src/index.ts`) serves `/models/*` + `/videos/*` from
+  `ASSETS_DIR` via `serveStatic` **ahead of** the SPA fallback (`c14e5a7`). The
+  tiny `gloss_to_idx.json` is also in-image as a fallback.
+- Heavy assets are **excluded** from both the image (`.dockerignore`) and the
+  upload (`.railwayignore`): `frontend/public/models/*.onnx`, `…/models/fp16`,
+  `…/videos`. Keeps the image lean + the upload well under 413.
+- **Seeding the volume** (one-time): a guarded `PUT /api/_seed/asset?path=…`
+  (+ `GET /api/_seed/manifest`), token-gated by env `SEED_TOKEN`, path-traversal-
+  safe, **off unless both `ASSETS_DIR` and `SEED_TOKEN` are set**
+  (`backend/src/routes/seed-assets.ts`). Procedure used: set a random
+  `SEED_TOKEN`, deploy, run `/tmp/asl_seed_upload.sh` (curl-PUTs all 103 files
+  ~639MB), verify, then **delete `SEED_TOKEN` + redeploy** to close the route
+  (now returns 404). The volume data persists across redeploys.
+- **Re-seed if the volume is ever wiped:** re-set a `SEED_TOKEN` var, redeploy,
+  re-run the upload loop (it lives at `/tmp/asl_seed_upload.sh`; regenerate from
+  the §"seed-assets" route shape if gone — it just PUTs every file under
+  `frontend/public/{models,videos}`), then delete `SEED_TOKEN` + redeploy.
 
-1. **External object storage (best for the videos).** Put videos+models in a
-   public bucket (Cloudflare R2 / S3 / Backblaze). Make the app's asset base
-   configurable: `videoSrcForSign` (`frontend/src/lib/lesson-config.ts`,
-   `LESSON_VIDEO_BASE`) and the model URLs (`frontend/src/cv/ort/models.ts`,
-   `/models/...`) → prefix with `VITE_ASSET_BASE` (build-time env). Build with
-   `VITE_ASSET_BASE=https://<bucket>`. No backend change; no upload-size issue.
-2. **Docker image via a registry (handles any size).** Build locally (`docker
-   build .` — `.dockerignore` keeps videos/models since they're on the local
-   FS), push to GHCR/Docker Hub, point the service at the image. Bypasses the
-   `railway up` upload limit. Needs registry creds.
-3. **Railway Volume** mounted at the assets path, populated once (e.g., boot
-   downloads from a temp URL). More moving parts.
-
-Quick test to confirm a fix served the models (not the SPA fallback):
-`curl -sI <URL>/models/net4.onnx` → expect `content-type: application/octet-stream`,
+Confirm models serve (not the SPA fallback):
+`curl -sI <URL>/models/net4.onnx` → `content-type: application/octet-stream`,
 NOT `text/html` (737b = index.html).
 
 ## 3. Other open issues
@@ -110,10 +116,20 @@ Recent commits (all local): `1153ccc 413-exclude videos`, `eba9ece no-gitignore`
 
 ## 6. Gotchas
 
-- `railway up` honors `.gitignore`; `--no-gitignore` + `.railwayignore` still
-  did not include the gitignored models/videos this session — that's the live
-  asset-serving blocker (see §2).
-- 413 at ~700MB upload; ~70MB uploads fine.
+- **`.railwayignore`/`.dockerignore` patterns are gitignore-style**: an
+  UNANCHORED name (`src`, `tools`, `tests`) matches that dir at ANY depth — it
+  WILL strip `frontend/src`/`backend/src` and break the build with empty deploy
+  logs. Anchor every repo-root dir with a leading slash (`/src`). This was the
+  asset-serving red herring that cost most of the 2026-05-26 session.
+- A FAILED deploy that never ran its CMD shows **empty deploy logs** — look at
+  the **build** logs (`railway logs <id> -b`), the failure is usually there.
+- `railway logs` with no id shows the most recent **successful** deploy; pass the
+  failed deployment id (from `railway deployment list --json`) to see its logs.
+- Deleting/changing a var does **not** reliably auto-redeploy; run
+  `railway redeploy --service asl-pilot-api -y` to apply env changes.
+- `railway volume files upload` needs an SSH key registered (`railway ssh keys
+  add`); we seed via the HTTP `/api/_seed` route instead (no SSH).
+- 413 at ~700MB upload; lean uploads (code only, assets on the volume) are fine.
 - Backend MUST run via `tsx` in prod (tsc-ESM emits extensionless imports
   `node` can't resolve). Build only the frontend in Docker.
 - vite-plugin-pwa errors on any precache file >2MB → `.wasm` is in `globIgnores`.
