@@ -8,6 +8,7 @@ import healthRoutes from './routes/health';
 import authRoutes from './routes/auth';
 import lessonsRoutes from './routes/lessons';
 import progressRoutes from './routes/progress';
+import seedAssetsRoutes from './routes/seed-assets';
 
 const app = new Hono();
 
@@ -17,6 +18,17 @@ app.route('/api/health', healthRoutes);
 app.route('/api/auth', authRoutes);
 app.route('/api/lessons', lessonsRoutes);
 app.route('/api/progress', progressRoutes);
+app.route('/api/_seed', seedAssetsRoutes);
+
+// Large runtime assets (CV models, lesson videos) live on a mounted volume in
+// prod (ASSETS_DIR) because they're gitignored + too big to ride the deploy
+// upload. Serve them from there ahead of the SPA fallback; a miss falls through
+// to the SPA static below. Unset locally, where they sit in frontend/public.
+const ASSETS_DIR = process.env.ASSETS_DIR;
+if (ASSETS_DIR) {
+  app.use('/models/*', serveStatic({ root: ASSETS_DIR }));
+  app.use('/videos/*', serveStatic({ root: ASSETS_DIR }));
+}
 
 // Serve the built SPA (frontend/dist) for everything non-/api. In single-service
 // deploys (Railway) this hosts the app + API under one origin; in local dev the
