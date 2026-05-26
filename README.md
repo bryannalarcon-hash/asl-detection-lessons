@@ -2,6 +2,8 @@
 
 Browser-based ASL vocabulary practice for college ASL 1 learners. SuperBuilders partner project.
 
+**Live app:** <https://asl-pilot-api-production.up.railway.app> — hosted on Railway (deploying shortly).
+
 ## Status
 
 Scaffold milestone — feature work begins after the 16 acceptance criteria in [`docs/prd-scaffold.md`](./docs/prd-scaffold.md) all pass.
@@ -15,6 +17,12 @@ Scaffold milestone — feature work begins after the 16 acceptance criteria in [
 - [`docs/ml-handoff.md`](./docs/ml-handoff.md) — how the ML model integrates
 - [`docs/training-plan.md`](./docs/training-plan.md) — ML training plan
 - [`docs/hoyso-architecture.md`](./docs/hoyso-architecture.md) — Stage 2 architecture reference
+
+### Submission deliverables
+
+- [`docs/DATASET_AND_TRAINING.md`](./docs/DATASET_AND_TRAINING.md) — dataset + model-training process, evidence no pretrained models were used (deliverable 3)
+- [`docs/VALIDATION_REPORT.md`](./docs/VALIDATION_REPORT.md) — accuracy targets, test conditions, known limitations (deliverable 4)
+- [`docs/PRIVACY.md`](./docs/PRIVACY.md) — how camera/video data is handled (deliverable 7)
 - [`docs/superbuilders/`](./docs/superbuilders/) — brand alignment
 - [`docs/competitive/`](./docs/competitive/) — competitive teardowns
 
