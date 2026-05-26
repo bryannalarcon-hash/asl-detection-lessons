@@ -4,6 +4,8 @@ Browser-based ASL vocabulary practice for college ASL 1 learners. SuperBuilders 
 
 **Live app:** <https://asl-pilot-api-production.up.railway.app> — hosted on Railway (deploying shortly).
 
+**Demo video:** <https://youtu.be/QOmy4kyRMqA>
+
 ## Status
 
 Scaffold milestone — feature work begins after the 16 acceptance criteria in [`docs/prd-scaffold.md`](./docs/prd-scaffold.md) all pass.
