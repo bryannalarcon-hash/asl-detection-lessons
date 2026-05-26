@@ -153,12 +153,14 @@ export default function PracticePage() {
     if (greenFiredRef.current) return;
     if (state.matches('SELF_REPORT')) {
       greenFiredRef.current = true;
+      // Hold the green result for ~3s so the learner sees the pass before we
+      // advance (auto-pass still fires, just not instantly).
       const t = window.setTimeout(() => {
         // Flip the box BEFORE sending PASS so the post-advance SELF_REPORT
         // re-render doesn't see a still-green box and chain-fire.
         setBoxState('orange');
         send({ type: 'PASS' });
-      }, 350);
+      }, 3000);
       return () => window.clearTimeout(t);
     }
     // Green outside SELF_REPORT (between reps) — just flash back to orange.
@@ -223,6 +225,7 @@ export default function PracticePage() {
       // Clear CV match feedback so it doesn't bleed into the next sign.
       setMatchScore(undefined);
       setShowRetry(false);
+      setBoxState('gray');
       // Drop the last verdict too, so manually opening the hint on the new
       // sign can't surface the previous sign's targeted diagnosis.
       resetVerdict();
@@ -263,7 +266,7 @@ export default function PracticePage() {
       setBoxState('green');
     } else {
       setMatchScore(verdict.targetConf);
-      setBoxState('orange');
+      setBoxState('red');
       setShowRetry(true);
       // Surface the targeted hint for this failed attempt (debounced via the
       // monotonic signal — HintButton opens once per bump, not per render).

@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
 import type { ReactNode } from 'react';
 
-export type BoxState = 'gray' | 'orange' | 'green';
+export type BoxState = 'gray' | 'orange' | 'green' | 'red';
 
 interface BoundingBoxProps {
   state: BoxState;
@@ -14,7 +14,8 @@ interface BoundingBoxProps {
  * ux-spec §"Bounding box semantics":
  *   - gray = no hands
  *   - orange = hands detected (recording)
- *   - green = target met (purely visual in v1; advance is from self-report)
+ *   - green = target met (sign recognized — auto-advances)
+ *   - red = attempt failed (target not recognized)
  */
 export function BoundingBox({ state, children, className }: BoundingBoxProps) {
   // Inset well by default (research: video is the brightest thing, panel recedes).
@@ -22,9 +23,11 @@ export function BoundingBox({ state, children, className }: BoundingBoxProps) {
   const stateClass =
     state === 'green'
       ? 'border-status-ok ring-2 ring-status-ok/30 ring-offset-0'
-      : state === 'orange'
-        ? 'border-status-warn ring-2 ring-status-warn/30'
-        : 'border-border';
+      : state === 'red'
+        ? 'border-status-err ring-2 ring-status-err/30'
+        : state === 'orange'
+          ? 'border-status-warn ring-2 ring-status-warn/30'
+          : 'border-border';
 
   return (
     <div

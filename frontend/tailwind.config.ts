@@ -44,6 +44,7 @@ export default {
           // Back-compat aliases
           ok: 'hsl(var(--status-ok))',
           warn: 'hsl(var(--status-warn))',
+          err: 'hsl(var(--error))',
         },
 
         'border-strong': 'hsl(var(--border-strong) / 0.22)',

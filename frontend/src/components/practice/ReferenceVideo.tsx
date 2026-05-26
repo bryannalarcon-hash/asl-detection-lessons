@@ -276,7 +276,10 @@ export function ReferenceVideo({
         </button>
       </div>
 
-      {/* Segment timeline overlay (bottom strip) */}
+      {/* Segment timeline overlay (bottom strip) — only when the video is
+          divided into handshape/movement sub-segments. Whole-sign lessons show
+          no divider bars. */}
+      {drillType !== 'sign' && (
       <div className="pointer-events-none absolute inset-x-3.5 bottom-1.5 flex h-1 gap-1">
         {SEGMENTS.map((s) => {
           const isActive = segment.label === s.label;
@@ -304,6 +307,7 @@ export function ReferenceVideo({
           );
         })}
       </div>
+      )}
 
       <span className="sr-only" data-testid="reference-sign-slug">
         {signSlug} · {englishGloss}
