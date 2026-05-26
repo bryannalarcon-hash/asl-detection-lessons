@@ -16,6 +16,11 @@ interface CameraPanelProps {
   captionMeta?: string;
   /** Optional floating overlay node (e.g. additional pills). */
   overlay?: ReactNode;
+  /**
+   * Fires with the live `<video>` element once the granted stream is attached,
+   * and with `null` when the stream goes away. Lets a capture hook grab frames.
+   */
+  onVideoEl?: (el: HTMLVideoElement | null) => void;
   className?: string;
 }
 
@@ -38,6 +43,7 @@ export function CameraPanel({
   matchScore,
   captionMeta,
   overlay,
+  onVideoEl,
   className,
 }: CameraPanelProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -54,16 +60,24 @@ export function CameraPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Wire the granted stream to the <video> element whenever it changes.
+  // Wire the granted stream to the <video> element whenever it changes, and
+  // expose the element to consumers (capture hook) once the stream is live.
   useEffect(() => {
-    if (state.kind !== 'granted') return;
+    if (state.kind !== 'granted') {
+      onVideoEl?.(null);
+      return;
+    }
     const v = videoRef.current;
     if (!v) return;
     if (v.srcObject !== state.stream) {
       v.srcObject = state.stream;
     }
     v.play().catch(() => undefined);
-  }, [state]);
+    onVideoEl?.(v);
+    return () => {
+      onVideoEl?.(null);
+    };
+  }, [state, onVideoEl]);
 
   // Pause/resume: disable tracks instead of stopping so we don't re-prompt
   // permission on resume.

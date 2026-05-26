@@ -14,20 +14,20 @@ import {
   effectiveReps,
   type PracticeSign,
 } from '@/lib/machines/practice';
-import {
-  readLessonConfig,
-  isAutoSegment,
-  type LessonConfig,
-} from '@/lib/lesson-config';
+import { readLessonConfig } from '@/lib/lesson-config';
 import { FALLBACK_SIGNS } from '@/lib/fallback-lesson';
-import { CameraPanel } from '@/components/practice/CameraPanel';
+import {
+  buildSignsFromBackend,
+  applyLessonConfig,
+} from '@/lib/practice-signs';
 import { ReferenceVideo } from '@/components/practice/ReferenceVideo';
 import { DrillIndicator } from '@/components/practice/DrillIndicator';
 import { RepCounter } from '@/components/practice/RepCounter';
 import { SelfReportRow } from '@/components/practice/SelfReportRow';
+import { RecordAttemptRow } from '@/components/practice/RecordAttemptRow';
 import { DevPanel } from '@/components/practice/DevPanel';
 import { HintButton } from '@/components/practice/HintButton';
-import { BoundingBox, type BoxState } from '@/components/practice/BoundingBox';
+import { type BoxState } from '@/components/practice/BoundingBox';
 import { PracticeHeader } from '@/components/practice/PracticeHeader';
 import { PauseOverlay } from '@/components/practice/PauseOverlay';
 import { SignCompleteToast } from '@/components/practice/SignCompleteToast';
@@ -36,82 +36,11 @@ import {
   writeResume,
   clearResume,
 } from '@/lib/practice-resume';
+import { useCaptureRep } from '@/hooks/useCaptureRep';
+import { CameraPanelWrapper, computeContinueLabel } from './practice-helpers';
+import { getSignHint } from '@/data/sign-hints';
+import { diagnoseAttempt } from '@/lib/hint-diagnosis';
 import type { DrillType } from '@/cv/types';
-
-/**
- * Build practice signs from backend data. The lesson plan presents only the
- * full-sign stage, so the handshape/movement drills are dropped here and each
- * sign keeps exactly one drill (`drillType === 'sign'`). When the backend
- * omits a sign drill, the first available drill is retargeted as the sign so
- * the sign still has a stage to run.
- */
-function buildSignsFromBackend(
-  signs: { id: string; slug: string; englishGloss: string }[],
-  drills: { signId: string; drillType: DrillType; targetString: string; orderIndex: number }[]
-): PracticeSign[] {
-  return signs.map((sign) => {
-    const signDrills = drills
-      .filter((d) => d.signId === sign.id)
-      .sort((a, b) => a.orderIndex - b.orderIndex)
-      .map((d) => ({ drillType: d.drillType, target: d.targetString }));
-    return {
-      id: sign.id,
-      slug: sign.slug,
-      englishGloss: sign.englishGloss,
-      drills: toFullSignDrills(signDrills, sign.englishGloss),
-    };
-  });
-}
-
-/**
- * Collapse a sign's drill list to a single full-sign drill. Prefers the
- * existing `sign` stage (carrying any reps/segment overlay); falls back to the
- * first drill retargeted as the sign, or a synthesized drill when the list is
- * empty, so every sign always has exactly one stage to practice.
- */
-function toFullSignDrills(
-  drills: PracticeSign['drills'],
-  englishGloss: string
-): PracticeSign['drills'] {
-  const signDrill = drills.find((d) => d.drillType === 'sign');
-  if (signDrill) return [signDrill];
-  const first = drills[0];
-  if (first) return [{ ...first, drillType: 'sign' }];
-  return [{ drillType: 'sign', target: englishGloss }];
-}
-
-/**
- * Apply a dev Lesson Config overlay onto the default signs. The overlay's sign
- * list defines the lesson's sign count and order; each entry carries per-stage
- * reps + clip trim. We overlay onto each sign's existing drills by matching
- * stage (drillType). Unknown slugs are dropped. An unset trim ({0,0}) is left
- * off so the reference video falls back to its natural segment.
- */
-function applyLessonConfig(
-  defaults: PracticeSign[],
-  config: LessonConfig
-): PracticeSign[] {
-  const bySlug = new Map(defaults.map((s) => [s.slug, s]));
-  const out: PracticeSign[] = [];
-  for (const sc of config.signs) {
-    const base = bySlug.get(sc.sign);
-    if (!base) continue;
-    out.push({
-      ...base,
-      videoSrc: sc.videoSrc,
-      drills: base.drills.map((d) => {
-        const stage = sc.stages[d.drillType];
-        if (!stage) return d;
-        return {
-          ...d,
-          reps: stage.reps,
-          segment: isAutoSegment(stage.segment) ? undefined : stage.segment,
-        };
-      }),
-    });
-  }
-  return out.length > 0 ? out : defaults;
-}
 
 export default function PracticePage() {
   const { slug = '' } = useParams<{ slug: string }>();
@@ -200,6 +129,15 @@ export default function PracticePage() {
 
   const [boxState, setBoxState] = useState<BoxState>('gray');
 
+  // In-browser CV capture. Degrades to self-report when init fails (notReady).
+  const capture = useCaptureRep();
+  const { resetVerdict } = capture;
+  const videoElRef = useRef<HTMLVideoElement | null>(null);
+  const [matchScore, setMatchScore] = useState<number | undefined>(undefined);
+  const [showRetry, setShowRetry] = useState(false);
+  // Bumped once per fresh failed recorded attempt to auto-open the targeted hint.
+  const [hintOpenSignal, setHintOpenSignal] = useState(0);
+
   // Auto-advance: a single green box advances exactly one rep, then drops
   // back to orange. The next rep needs its own green trigger — the box must
   // leave green and re-enter green before another PASS fires. Without the
@@ -282,10 +220,16 @@ export default function PracticePage() {
         setCongratsSign(prevSignGlossRef.current);
       }
       signSkippedRef.current = false;
+      // Clear CV match feedback so it doesn't bleed into the next sign.
+      setMatchScore(undefined);
+      setShowRetry(false);
+      // Drop the last verdict too, so manually opening the hint on the new
+      // sign can't surface the previous sign's targeted diagnosis.
+      resetVerdict();
     }
     prevSignIndexRef.current = next;
     prevSignGlossRef.current = currentSign?.englishGloss ?? null;
-  }, [state.context.signIndex, currentSign]);
+  }, [state.context.signIndex, currentSign, resetVerdict]);
 
   // CTA label: within-sign rep advances read "Next rep (X of N) →"; the last
   // rep of a sign (next press starts a new word) reads "Continue →".
@@ -293,6 +237,51 @@ export default function PracticePage() {
     repIndex: state.context.repIndex,
     repTotal: repsForCurrentSign,
   });
+
+  // Target gloss for the CV model — sign's gloss uppercased (gloss_to_idx keys
+  // are like 'MOM','DAD'). CV is offered only when the model knows this gloss.
+  const targetGloss = currentSign?.englishGloss.toUpperCase() ?? '';
+  const cvAvailable =
+    capture.ready && !capture.notReady && targetGloss.length > 0 && capture.hasGloss(targetGloss);
+
+  // Run one in-browser CV rep. On pass: green box + match score + PASS event
+  // (the auto-advance effect picks up green-in-SELF_REPORT). On fail: orange +
+  // a brief "try again". Any null verdict (skipped/empty/error) leaves the
+  // self-report flow untouched.
+  const onRecordAttempt = async () => {
+    const videoEl = videoElRef.current;
+    if (!videoEl || !cvAvailable) return;
+    setShowRetry(false);
+    setBoxState('orange');
+    const verdict = await capture.recordAttempt(videoEl, targetGloss);
+    if (!verdict) {
+      setBoxState('orange');
+      return;
+    }
+    if (verdict.pass) {
+      setMatchScore(verdict.targetConf);
+      setBoxState('green');
+    } else {
+      setMatchScore(verdict.targetConf);
+      setBoxState('orange');
+      setShowRetry(true);
+      // Surface the targeted hint for this failed attempt (debounced via the
+      // monotonic signal — HintButton opens once per bump, not per render).
+      setHintOpenSignal((n) => n + 1);
+    }
+  };
+
+  // Hint copy: an unprompted open shows the word-tied default; a failed recorded
+  // attempt swaps in a targeted, parameter-specific diagnosis of what went wrong.
+  const signHint = useMemo(
+    () => (currentSign ? getSignHint(currentSign.englishGloss) : null),
+    [currentSign]
+  );
+  const { lastVerdict } = capture;
+  const attemptHint = useMemo(
+    () => (lastVerdict && !lastVerdict.pass ? diagnoseAttempt(lastVerdict, signHint) : null),
+    [lastVerdict, signHint]
+  );
 
   // Restart sign — clear progress on the current sign without losing position.
   const restartSign = () => {
@@ -369,6 +358,10 @@ export default function PracticePage() {
               boxState={boxState}
               mirror={settings.mirror}
               paused={paused}
+              matchScore={matchScore}
+              onVideoEl={(el) => {
+                videoElRef.current = el;
+              }}
             />
           )}
           {showReference && currentSign && (
@@ -400,6 +393,9 @@ export default function PracticePage() {
               signSlug={currentSign.slug}
               englishGloss={currentSign.englishGloss}
               failCount={state.context.signFailCount}
+              defaultHint={signHint?.default}
+              attemptHint={attemptHint}
+              openSignal={hintOpenSignal}
             />
             <button
               type="button"
@@ -424,6 +420,15 @@ export default function PracticePage() {
               continueLabel={continueLabel}
               skipLabel="Skip this sign →"
             />
+            {cvAvailable && (
+              <RecordAttemptRow
+                phase={capture.phase}
+                countdown={capture.countdown}
+                disabled={capture.recording || !videoElRef.current}
+                showRetry={showRetry}
+                onRecord={() => void onRecordAttempt()}
+              />
+            )}
             <p
               data-testid="practice-advance-help"
               className="text-center font-mono text-[0.76rem] text-fg-subtle"
@@ -455,48 +460,4 @@ export default function PracticePage() {
       </main>
     </div>
   );
-}
-
-/**
- * Advance-button label. With the full-sign-only plan a sign has one drill, so
- * a drill transition is a word transition. If reps remain in the current sign
- * the next press advances a rep -> "Next rep (X of N) →". On the last rep the
- * next press moves to a different word -> "Continue →".
- */
-function computeContinueLabel({
-  repIndex,
-  repTotal,
-}: {
-  repIndex: number;
-  repTotal: number;
-}): string {
-  const isLastRep = repIndex >= repTotal - 1;
-  if (!isLastRep) {
-    return `Next rep (${repIndex + 2} of ${repTotal}) →`;
-  }
-  return 'Continue →';
-}
-
-function CameraPanelWrapper({
-  boxState,
-  mirror,
-  paused,
-}: {
-  boxState: BoxState;
-  mirror: boolean;
-  paused: boolean;
-}) {
-  const [canUseCamera] = useState<boolean>(
-    typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia)
-  );
-  if (!canUseCamera) {
-    return (
-      <BoundingBox state={boxState} className="aspect-[4/3] w-full">
-        <div className="flex h-full w-full items-center justify-center bg-bg-deep text-center text-sm text-fg-muted">
-          <p>Camera unavailable in this preview.</p>
-        </div>
-      </BoundingBox>
-    );
-  }
-  return <CameraPanel boxState={boxState} mirror={mirror} paused={paused} />;
 }
