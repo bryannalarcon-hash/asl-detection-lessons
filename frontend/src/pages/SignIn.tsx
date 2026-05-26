@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,6 +12,7 @@ import { useSignIn } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
 import { isDevToolsEnabled } from '@/lib/env';
 import { DEV_EMAIL, DEV_PASSWORD } from '@/lib/dev-credentials';
+import { preloadCaptureRep } from '@/cv/captureRep';
 
 const schema = z.object({
   email: z.string().email('Enter a valid email.'),
@@ -30,6 +31,13 @@ export default function SignInPage() {
   const navigate = useNavigate();
   const signIn = useSignIn();
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Warm the in-browser CV engine (worker + ONNX nets) while the learner signs
+  // in, so the lesson's Record button is ready with no cold-start. The worker
+  // is a session singleton kept loaded across navigation.
+  useEffect(() => {
+    void preloadCaptureRep();
+  }, []);
 
   const { register, handleSubmit, formState } = useForm<FormValues>({
     resolver: zodResolver(schema),

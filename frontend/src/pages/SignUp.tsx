@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -10,6 +10,7 @@ import { Eyebrow } from '@/components/ui/eyebrow';
 import { SkipLoginButton } from '@/components/auth/SkipLoginButton';
 import { useSignUp } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
+import { preloadCaptureRep } from '@/cv/captureRep';
 
 const schema = z
   .object({
@@ -37,6 +38,13 @@ export default function SignUpPage() {
   const navigate = useNavigate();
   const signUp = useSignUp();
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Warm the in-browser CV engine (worker + ONNX nets) while the learner signs
+  // up, so the lesson's Record button is ready with no cold-start. The worker
+  // is a session singleton kept loaded across navigation.
+  useEffect(() => {
+    void preloadCaptureRep();
+  }, []);
 
   const { register, handleSubmit, formState } = useForm<FormValues>({
     resolver: zodResolver(schema),

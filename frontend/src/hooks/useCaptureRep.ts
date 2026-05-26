@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   initCaptureRep,
   evaluateClip,
-  disposeCaptureRep,
   type RepVerdict,
 } from '@/cv/captureRep';
 
@@ -191,8 +190,11 @@ export function useCaptureRep(): UseCaptureRepResult {
     })();
     return () => {
       cancelled = true;
+      // Stop THIS instance's in-flight rep from setting state, but do NOT
+      // dispose the worker — it's a session singleton (preloaded at sign-in)
+      // kept warm across navigation so Practice has no cold-start. The browser
+      // reclaims it on page unload.
       disposedRef.current = true;
-      disposeCaptureRep();
     };
   }, []);
 

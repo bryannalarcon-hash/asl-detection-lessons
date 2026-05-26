@@ -151,6 +151,25 @@ export function initCaptureRep(cfg: CaptureRepConfig): Promise<InitCaptureRepRes
 }
 
 /**
+ * Warm the engine ahead of the practice screen: fetch the gloss map and kick
+ * off the (idempotent) init so the worker + 4 ONNX nets are loaded and warmed
+ * by the time the learner reaches a lesson. Safe to call repeatedly and from
+ * multiple screens; errors are swallowed (Practice's useCaptureRep re-attempts
+ * and degrades to self-report if CV truly can't load).
+ */
+export async function preloadCaptureRep(): Promise<void> {
+  if (initPromise) return;
+  try {
+    const resp = await fetch('/models/gloss_to_idx.json');
+    if (!resp.ok) return;
+    const data = (await resp.json()) as { gloss_to_idx: Record<string, number> };
+    await initCaptureRep({ glossToIdx: data.gloss_to_idx });
+  } catch {
+    // Swallow — the practice screen retries and falls back to self-report.
+  }
+}
+
+/**
  * Pack the captured frames into one zero-copy RGBA buffer, ship them to the
  * worker, and await the verdict for `target`. Rejects if the worker is not
  * initialized, if a rep is already in flight, or if `frames` is empty / ragged.
