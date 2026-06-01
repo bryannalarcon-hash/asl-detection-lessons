@@ -95,7 +95,7 @@ test('forcing Set Green via dev panel auto-advances the rep', async ({ page }) =
   await expect(repCounter).toBeVisible();
   await expect(repCounter).toHaveText(/1.*(of|\/).*3/i);
 
-  // Click Set Green — should auto-advance after the visible flash
+  // Click Set Green — auto-advances after the ~3s visible green hold (Practice.tsx).
   await page.locator('[data-testid="dev-set-green"]').click();
-  await expect(repCounter).toHaveText(/2.*(of|\/).*3/i, { timeout: 2_000 });
+  await expect(repCounter).toHaveText(/2.*(of|\/).*3/i, { timeout: 4_000 });
 });

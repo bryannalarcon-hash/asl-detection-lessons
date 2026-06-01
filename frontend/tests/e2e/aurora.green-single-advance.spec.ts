@@ -20,15 +20,16 @@ test('Set Green advances exactly one rep, not multiple', async ({ page }) => {
   // One Set-Green click.
   await page.locator('[data-testid="dev-set-green"]').click();
 
-  // Rep ticks to 2 of 3.
-  await expect(repCounter).toHaveText(/2.*(of|\/).*3/i, { timeout: 2_000 });
+  // Rep ticks to 2 of 3. The green result is held ~3s before the auto-PASS
+  // fires (Practice.tsx), so allow margin beyond that hold.
+  await expect(repCounter).toHaveText(/2.*(of|\/).*3/i, { timeout: 4_000 });
 
   // Wait long enough that any chain-fire would have settled at rep 3+. If
   // the green latch holds, rep stays at 2.
   await page.waitForTimeout(2_000);
   await expect(repCounter).toHaveText(/2.*(of|\/).*3/i);
 
-  // A second Set-Green click should advance again.
+  // A second Set-Green click should advance again (after the ~3s green hold).
   await page.locator('[data-testid="dev-set-green"]').click();
-  await expect(repCounter).toHaveText(/3.*(of|\/).*3/i, { timeout: 2_000 });
+  await expect(repCounter).toHaveText(/3.*(of|\/).*3/i, { timeout: 4_000 });
 });
