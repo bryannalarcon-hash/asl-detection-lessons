@@ -221,3 +221,347 @@
     filter: brightness(1.08);
   }
 }
+
+/* ===========================================================================
+ * Mobile immersive Practice (mock screens 17-21). Mobile-only, full-bleed
+ * "Google-Meet" stage owned by PracticeImmersive.tsx. Tokens are adapted from
+ * the design handoff's plain colors to our hsl(var(--*)) triplet system.
+ * =========================================================================== */
+.pf-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: hsl(var(--bg-deep));
+  overflow: hidden;
+  touch-action: pan-y;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.pf-viewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* Feed slots — an ON feed is mounted; turning a feed off unmounts it (releasing
+ * the camera). When both are on, swap only flips these classes (no remount). */
+.pf-feed-slot.pf-slot-main { position: absolute; inset: 0; z-index: 1; }
+.pf-feed-slot.pf-slot-pip {
+  position: absolute;
+  right: 14px;
+  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  z-index: 8;
+  width: 38%;
+  max-width: 220px;
+  min-width: 120px;
+  aspect-ratio: 3 / 4;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.5);
+  transition: bottom 0.25s ease;
+}
+.pf-chrome-hidden .pf-feed-slot.pf-slot-pip {
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+}
+/* Coerce the reused media component root (CameraPanel / ReferenceVideo) to fill
+ * its slot — they ship as fixed 4:3 cards; their inner <video> is object-cover. */
+.pf-feed-slot.pf-slot-main > *,
+.pf-feed-slot.pf-slot-pip > * {
+  position: absolute !important;
+  inset: 0 !important;
+  height: 100% !important;
+  width: 100% !important;
+  aspect-ratio: auto !important;
+  border-radius: 0 !important;
+  border: 0 !important;
+}
+
+/* The reused feed components paint their own top-left caption pill; on the
+ * immersive MAIN feed it collides with the top scrim, so hide it there (the
+ * scrim already names the sign). The PiP keeps its caption as a small label. */
+.pf-feed-slot.pf-slot-main > * > .left-3.top-3 { display: none; }
+
+/* The dev camera force-state toolbox would clutter the immersive stage / PiP
+ * (and isn't part of the mock). It stays available on the desktop layout. */
+.pf-shell [data-testid='dev-camera-toolbox'] { display: none; }
+
+.pf-pip-cover {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: transparent;
+}
+.pf-pip-swap {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: #f1f5fb;
+  background: rgba(5, 7, 13, 0.7);
+  backdrop-filter: blur(6px);
+}
+
+.pf-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+}
+
+.pf-badge-match {
+  position: absolute;
+  top: calc(64px + env(safe-area-inset-top, 0px));
+  right: 14px;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  color: #f1f5fb;
+  background: rgba(5, 7, 13, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(8px);
+}
+.pf-chrome-hidden .pf-badge-match { top: calc(16px + env(safe-area-inset-top, 0px)); }
+.pf-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: hsl(var(--success));
+  box-shadow: 0 0 0 4px hsl(var(--success) / 0.3);
+  animation: pf-pulse 1.4s infinite;
+}
+@keyframes pf-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+.pf-swipe-flash {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 9;
+  font-size: 1rem;
+  color: #f1f5fb;
+  background: rgba(5, 7, 13, 0.8);
+  padding: 10px 22px;
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+  animation: pf-flashfade 0.6s ease;
+}
+@keyframes pf-flashfade {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.05); }
+}
+
+/* Top scrim */
+.pf-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 28px;
+  color: #f1f5fb;
+  background: linear-gradient(180deg, rgba(5, 7, 13, 0.72) 0%, rgba(5, 7, 13, 0) 100%);
+  transition: opacity 0.25s, transform 0.25s;
+}
+.pf-chrome-hidden .pf-top { opacity: 0; transform: translateY(-100%); pointer-events: none; }
+.pf-top-back { display: inline-flex; align-items: center; gap: 6px; min-width: 0; color: rgba(255, 255, 255, 0.85); font-size: 0.9rem; }
+.pf-top-back-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 34vw; }
+.pf-top-center { display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; min-width: 0; }
+.pf-top-word { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; font-weight: 800; font-size: 1.05rem; letter-spacing: -0.01em; color: #fff; }
+.pf-top-sub { font-size: 0.72rem; color: rgba(255, 255, 255, 0.7); }
+.pf-top-right { display: flex; align-items: center; gap: 8px; }
+.pf-top-counter { font-size: 0.78rem; color: rgba(255, 255, 255, 0.8); }
+.pf-icon-quiet {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.08);
+  transition: background 0.15s;
+}
+.pf-icon-quiet:hover { background: rgba(255, 255, 255, 0.18); color: #fff; }
+
+/* Stage progress segments */
+.pf-progress {
+  position: absolute;
+  top: calc(60px + env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  gap: 6px;
+  transition: opacity 0.25s;
+}
+.pf-chrome-hidden .pf-progress { opacity: 0; }
+.pf-progress-seg { width: 36px; height: 4px; border-radius: 999px; background: rgba(255, 255, 255, 0.25); }
+.pf-progress-seg.active { background: hsl(var(--accent)); }
+.pf-progress-seg.done { background: rgba(255, 255, 255, 0.7); }
+
+/* Hint bubble */
+.pf-hint-float {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+  z-index: 11;
+  background: rgba(5, 7, 13, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  padding: 16px 40px 16px 18px;
+  color: #f1f5fb;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+.pf-hint-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Bottom dock */
+.pf-dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  padding: 28px 12px calc(18px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(0deg, rgba(5, 7, 13, 0.72) 0%, rgba(5, 7, 13, 0) 100%);
+  transition: opacity 0.25s, transform 0.25s;
+}
+.pf-chrome-hidden .pf-dock { opacity: 0; transform: translateY(100%); pointer-events: none; }
+.pf-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  width: calc(100% - 8px);
+  border-radius: 999px;
+  background: rgba(12, 18, 30, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+.pf-icon {
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #f1f5fb;
+  background: rgba(255, 255, 255, 0.08);
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.pf-icon:hover { background: rgba(255, 255, 255, 0.18); }
+.pf-icon.active { background: hsl(var(--accent)); color: #05070d; }
+.pf-icon.muted { background: rgba(248, 113, 113, 0.22); color: #fecaca; }
+.pf-icon.pf-icon-record { color: #fca5a5; }
+.pf-icon.pf-icon-record.recording { animation: pf-pulse 1s infinite; background: rgba(248, 113, 113, 0.3); }
+.pf-icon:disabled { opacity: 0.35; cursor: not-allowed; }
+.pf-continue {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 42px;
+  padding: 0 14px;
+  margin-left: auto;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #08101c;
+  background: var(--grad-primary);
+  flex-shrink: 0;
+  transition: filter 0.15s;
+}
+.pf-continue:hover { filter: brightness(1.08); }
+.pf-continue-label { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Options bottom sheet */
+.pf-sheet-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 14;
+  background: rgba(5, 7, 13, 0.5);
+  backdrop-filter: blur(2px);
+  animation: pf-fadein 0.15s ease;
+}
+@keyframes pf-fadein { from { opacity: 0; } to { opacity: 1; } }
+.pf-sheet {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  z-index: 15;
+  width: min(560px, 100%);
+  max-height: 85vh;
+  overflow-y: auto;
+  background: hsl(var(--bg-paper));
+  border: 1px solid hsl(var(--line) / 0.14);
+  border-bottom: 0;
+  border-radius: 20px 20px 0 0;
+  padding: 14px 20px calc(28px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.5);
+  animation: pf-sheet-up 0.22s ease;
+}
+@keyframes pf-sheet-up { from { transform: translate(-50%, 100%); } to { transform: translate(-50%, 0); } }
+.pf-sheet-handle { width: 42px; height: 4px; border-radius: 999px; background: hsl(var(--line) / 0.3); margin: 0 auto 14px; }
+.pf-sheet-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+.pf-sheet-title { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; font-weight: 800; font-size: 1.1rem; margin-top: 4px; color: hsl(var(--fg)); }
+.pf-sheet .pf-icon-quiet { background: hsl(var(--bg-elev)); color: hsl(var(--fg-muted)); }
+.pf-opt-list { display: flex; flex-direction: column; }
+.pf-opt { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-bottom: 1px solid hsl(var(--line) / 0.07); }
+.pf-opt-label { font-size: 0.94rem; color: hsl(var(--fg)); }
+.pf-switch { position: relative; width: 44px; height: 26px; border-radius: 999px; background: hsl(var(--bg-elev)); transition: background 0.15s; flex-shrink: 0; }
+.pf-switch.on { background: hsl(var(--accent)); }
+.pf-switch-thumb { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform 0.15s; }
+.pf-switch.on .pf-switch-thumb { transform: translateX(18px); }
+.pf-sheet-foot { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+.pf-sheet-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.8rem;
+  color: hsl(var(--fg-muted));
+  background: hsl(var(--bg-elev));
+  transition: background 0.15s, color 0.15s;
+}
+.pf-sheet-action:hover { color: hsl(var(--fg)); background: hsl(var(--bg-deep)); }
+.pf-sheet-action:disabled { opacity: 0.4; cursor: not-allowed; }

@@ -79,3 +79,46 @@ test.describe('desktop (1280px)', () => {
     await expect(page.locator('[data-testid="mobile-tabbar"]')).toBeHidden();
   });
 });
+
+test.describe('mobile practice is immersive (mock 17-21)', () => {
+  test.use({ viewport: PHONE.viewport, isMobile: true, hasTouch: true });
+
+  test('renders the immersive shell, not the desktop grid, with no overflow', async ({ page }) => {
+    await signInViaDevBypass(page);
+    await page.goto('/lessons/lesson-1/practice', { waitUntil: 'load' });
+
+    await expect(page.locator('[data-testid="practice-immersive"]')).toBeVisible();
+    await expect(page.locator('[data-testid="page-practice"]')).toBeVisible();
+    // The immersive layout has its own chrome — the desktop practice header is absent.
+    await expect(page.locator('[data-testid="practice-header"]')).toHaveCount(0);
+
+    const { scrollW, clientW } = await page.evaluate(() => ({
+      scrollW: document.documentElement.scrollWidth,
+      clientW: document.documentElement.clientWidth,
+    }));
+    expect(scrollW - clientW).toBeLessThanOrEqual(1);
+  });
+
+  test('swap control and options sheet are reachable', async ({ page }) => {
+    await signInViaDevBypass(page);
+    await page.goto('/lessons/lesson-1/practice', { waitUntil: 'load' });
+    await expect(page.locator('[data-testid="practice-immersive"]')).toBeVisible();
+
+    await page.locator('[data-testid="practice-more"]').click();
+    await expect(page.locator('[data-testid="practice-options-sheet"]')).toBeVisible();
+    // Continue (advance) control is present in the dock.
+    await expect(page.locator('[data-testid="self-report-got-it"]')).toBeVisible();
+  });
+});
+
+test.describe('desktop practice keeps the grid layout', () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  test('uses the desktop practice header, not the immersive shell', async ({ page }) => {
+    await signInViaDevBypass(page);
+    await page.goto('/lessons/lesson-1/practice', { waitUntil: 'load' });
+
+    await expect(page.locator('[data-testid="practice-header"]')).toBeVisible();
+    await expect(page.locator('[data-testid="practice-immersive"]')).toHaveCount(0);
+  });
+});

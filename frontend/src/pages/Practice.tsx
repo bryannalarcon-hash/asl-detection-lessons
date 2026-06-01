@@ -53,12 +53,24 @@ import { CameraPanelWrapper, computeContinueLabel } from './practice-helpers';
 import { getSignHint } from '@/data/sign-hints';
 import { diagnoseAttempt } from '@/lib/hint-diagnosis';
 import type { DrillType } from '@/cv/types';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { PracticeImmersive } from '@/components/practice/PracticeImmersive';
+
+// Human-readable stage labels for the immersive top scrim + progress segments.
+const DRILL_LABEL: Record<DrillType, string> = {
+  handshape: 'Handshape',
+  movement: 'Movement',
+  sign: 'Whole sign',
+};
 
 export default function PracticePage() {
   const { slug = '' } = useParams<{ slug: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { settings } = useAppSettings();
+  const { settings, update: updateSettings } = useAppSettings();
+  // Below the `md` break the practice screen renders the immersive mobile
+  // layout (mock 17-21); at/above it the desktop side-by-side grid renders.
+  const isMobile = useMediaQuery('(max-width: 767px)');
 
   // URL state controls camera/reference visibility — supports mid-lesson toggles.
   const cameraOn = (searchParams.get('camera') ?? (settings.cameraDefault ? '1' : '0')) === '1';
@@ -308,6 +320,86 @@ export default function PracticePage() {
     // BACK_DRILL repeatedly. Cheaper than introducing a new machine event.
     for (let i = 0; i < drillTypes.length; i++) send({ type: 'BACK_DRILL' });
   };
+
+  // ---- Mobile immersive layout (mock 17-21) -------------------------------
+  // Reuses every handler/derived value above; only the presentation differs.
+  if (isMobile) {
+    if (!currentSign || !currentDrill) {
+      return (
+        <div
+          data-testid="page-practice"
+          data-mode={`${cameraOn ? 'cam' : 'nocam'}-${referenceOn ? 'ref' : 'noref'}`}
+          className="flex min-h-screen items-center justify-center bg-bg text-fg"
+        >
+          <p className="font-mono text-sm text-fg-muted">Loading practice…</p>
+        </div>
+      );
+    }
+    const pct =
+      capture.lastVerdict != null ? Math.round(capture.lastVerdict.targetConf * 100) : null;
+    const matchText = !cvAvailable
+      ? null
+      : capture.recording
+        ? 'recording…'
+        : showRetry
+          ? 'try again'
+          : capture.lastVerdict
+            ? `${pct}% match`
+            : 'tap ● to check';
+    return (
+      <div
+        data-testid="page-practice"
+        data-mode={`${cameraOn ? 'cam' : 'nocam'}-${referenceOn ? 'ref' : 'noref'}`}
+        className="min-h-screen bg-bg text-fg"
+      >
+        <PracticeImmersive
+          lessonTitle={lessonQuery.data?.lesson?.title ?? slug}
+          lessonSlug={slug}
+          signWord={currentSign.englishGloss}
+          signSlug={currentSign.slug}
+          videoSrc={currentSign.videoSrc}
+          drillType={currentDrill.drillType}
+          segment={currentDrill.segment}
+          stageLabels={drillTypes.map((d) => DRILL_LABEL[d])}
+          currentStageIndex={state.context.drillIndex}
+          signIndex={state.context.signIndex}
+          signTotal={state.context.signs.length}
+          repIndex={state.context.repIndex}
+          repTotal={repsForCurrentSign}
+          continueLabel={continueLabel}
+          cameraOn={cameraOn}
+          referenceOn={referenceOn}
+          mirror={settings.mirror}
+          paused={paused}
+          boxState={boxState}
+          canBackDrill={canBackDrill}
+          canBackSign={canBackSign}
+          cvAvailable={cvAvailable}
+          recording={capture.recording}
+          videoElReady={videoElReady}
+          recordLabel={capture.recording ? 'Recording attempt' : 'Record attempt'}
+          matchText={matchText}
+          hintText={attemptHint?.hint ?? signHint?.default ?? null}
+          hintOpenSignal={hintOpenSignal}
+          onVideoEl={(el) => {
+            videoElRef.current = el;
+            setVideoElReady(!!el);
+          }}
+          onToggleCamera={() => setSearchParam('camera', cameraOn ? '0' : '1')}
+          onToggleReference={() => setSearchParam('reference', referenceOn ? '0' : '1')}
+          onToggleMirror={() => updateSettings({ mirror: !settings.mirror })}
+          onContinue={() => send({ type: 'PASS' })}
+          onSkip={() => send({ type: 'SKIP' })}
+          onBackDrill={() => send({ type: 'BACK_DRILL' })}
+          onBackSign={() => send({ type: 'BACK_SIGN' })}
+          onRestartSign={restartSign}
+          onPause={() => setPaused((p) => !p)}
+          onExit={() => navigate('/dashboard')}
+          onRecordAttempt={() => void onRecordAttempt()}
+        />
+      </div>
+    );
+  }
 
   return (
     <div
