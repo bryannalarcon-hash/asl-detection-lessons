@@ -147,21 +147,27 @@ export default function LessonCompletePage() {
         </p>
       </section>
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         {nextLesson ? (
-          <Link to={`/lessons/${nextLesson.slug}`} data-testid="next-lesson-cta">
-            <Button size="lg">
+          <Link
+            to={`/lessons/${nextLesson.slug}`}
+            data-testid="next-lesson-cta"
+            className="block w-full sm:w-auto"
+          >
+            <Button size="lg" className="h-auto w-full whitespace-normal py-2.5 text-center sm:w-auto">
               Continue to Lesson № {String(nextLesson.orderIndex || 0).padStart(2, '0')} ·{' '}
               {nextLesson.title} →
             </Button>
           </Link>
         ) : (
-          <Link to="/lessons" data-testid="next-lesson-cta">
-            <Button size="lg">Next lesson</Button>
+          <Link to="/lessons" data-testid="next-lesson-cta" className="block w-full sm:w-auto">
+            <Button size="lg" className="w-full sm:w-auto">
+              Next lesson
+            </Button>
           </Link>
         )}
-        <Link to="/dashboard" data-testid="back-to-dashboard-cta">
-          <Button size="lg" variant="ghost">
+        <Link to="/dashboard" data-testid="back-to-dashboard-cta" className="block w-full sm:w-auto">
+          <Button size="lg" variant="ghost" className="w-full sm:w-auto">
             Back to dashboard
           </Button>
         </Link>

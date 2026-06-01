@@ -1,13 +1,15 @@
 /**
  * Authenticated app layout providing the sticky top nav (logo, primary links,
- * and user menu) and an Outlet for the routed page below it. It exposes sign-out
- * and reflects the current user, falling back to a sign-in link when absent.
+ * and user menu) and an Outlet for the routed page below it. On narrow viewports
+ * the inline nav links collapse and navigation moves to a fixed bottom MobileTabBar;
+ * it exposes sign-out, reflects the current user, and falls back to a sign-in link.
  */
 import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { useUser, useSignOut } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { BrandMark } from '@/components/ui/brand-mark';
 import { Wordmark } from '@/components/ui/wordmark';
+import { MobileTabBar } from '@/components/layout/MobileTabBar';
 
 export function AppShell() {
   const { user } = useUser();
@@ -40,33 +42,36 @@ export function AppShell() {
             <Wordmark />
           </Link>
           <nav className="flex items-center gap-4 text-sm">
-            <Link
-              to="/lessons"
-              data-testid="nav-lessons"
-              className="text-fg-muted hover:text-fg"
-            >
-              Lessons
-            </Link>
-            <Link
-              to="/dashboard"
-              data-testid="nav-dashboard"
-              className="text-fg-muted hover:text-fg"
-            >
-              Dashboard
-            </Link>
-            <Link
-              to="/settings/app"
-              data-testid="nav-settings"
-              className="text-fg-muted hover:text-fg"
-            >
-              Settings
-            </Link>
-            <Link to="/help" data-testid="nav-help" className="text-fg-muted hover:text-fg">
-              Help
-            </Link>
+            {/* Inline links collapse below `md` — navigation moves to MobileTabBar. */}
+            <div className="hidden items-center gap-4 md:flex">
+              <Link
+                to="/lessons"
+                data-testid="nav-lessons"
+                className="text-fg-muted hover:text-fg"
+              >
+                Lessons
+              </Link>
+              <Link
+                to="/dashboard"
+                data-testid="nav-dashboard"
+                className="text-fg-muted hover:text-fg"
+              >
+                Dashboard
+              </Link>
+              <Link
+                to="/settings/app"
+                data-testid="nav-settings"
+                className="text-fg-muted hover:text-fg"
+              >
+                Settings
+              </Link>
+              <Link to="/help" data-testid="nav-help" className="text-fg-muted hover:text-fg">
+                Help
+              </Link>
+            </div>
             {user ? (
-              <div className="flex items-center gap-2 border-l border-border pl-4">
-                <span className="text-xs text-fg-muted">{user.displayName}</span>
+              <div className="flex items-center gap-2 md:border-l md:border-border md:pl-4">
+                <span className="hidden text-xs text-fg-muted md:inline">{user.displayName}</span>
                 <Button
                   data-testid="nav-sign-out"
                   variant="ghost"
@@ -88,9 +93,11 @@ export function AppShell() {
           </nav>
         </div>
       </header>
-      <div className="flex-1">
+      {/* Bottom padding on mobile clears the fixed tab bar so content isn't hidden. */}
+      <div className="flex-1 pb-24 md:pb-0">
         <Outlet />
       </div>
+      <MobileTabBar />
     </div>
   );
 }

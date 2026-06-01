@@ -49,26 +49,30 @@ export function PracticeHeader({
   return (
     <header
       data-testid="practice-header"
-      className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-border bg-[hsl(var(--bg)/0.85)] px-6 backdrop-blur-md"
+      className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border bg-[hsl(var(--bg)/0.85)] px-4 backdrop-blur-md md:gap-4 md:px-6"
     >
       <Link
         to={`/lessons/${lessonSlug}`}
         data-testid="practice-back-lesson"
-        className="inline-flex items-center gap-1.5 font-mono text-[0.86rem] text-fg-muted transition-colors hover:text-fg focus-visible:outline-2 focus-visible:outline-accent-ring focus-visible:outline-offset-2"
+        className="inline-flex min-w-0 items-center gap-1.5 font-mono text-[0.86rem] text-fg-muted transition-colors hover:text-fg focus-visible:outline-2 focus-visible:outline-accent-ring focus-visible:outline-offset-2"
         aria-label={`Back to ${lessonTitle} lesson intro`}
       >
-        <ChevronLeft className="h-4 w-4" />
-        <span>
-          Lesson · <span className="text-fg">{lessonTitle}</span>
+        <ChevronLeft className="h-4 w-4 flex-none" />
+        <span className="truncate">
+          <span className="hidden sm:inline">Lesson · </span>
+          <span className="text-fg">{lessonTitle}</span>
         </span>
       </Link>
 
-      <div className="ml-auto flex flex-wrap items-center gap-2 text-fg-muted">
+      <div className="ml-auto flex flex-none items-center gap-1 text-fg-muted md:flex-wrap md:gap-2">
         <span
           data-testid="practice-progress"
           className="px-1 font-mono text-[0.78rem] text-fg"
         >
-          Sign {signIndex + 1} of {signTotal}
+          <span className="hidden sm:inline">Sign </span>
+          {signIndex + 1}
+          <span className="hidden sm:inline"> of</span>
+          <span className="sm:hidden">/</span> {signTotal}
         </span>
 
         <HeaderButton
@@ -76,9 +80,10 @@ export function PracticeHeader({
           disabled={!canBackDrill}
           onClick={onBackDrill}
           title="Back one drill"
+          aria-label="Back one drill"
         >
           <Undo2 className="h-3.5 w-3.5" />
-          Back drill
+          <span className="hidden md:inline">Back drill</span>
         </HeaderButton>
 
         <HeaderButton
@@ -86,9 +91,10 @@ export function PracticeHeader({
           disabled={!canBackSign}
           onClick={onBackSign}
           title="Back one sign"
+          aria-label="Back one sign"
         >
           <CornerUpLeft className="h-3.5 w-3.5" />
-          Back sign
+          <span className="hidden md:inline">Back sign</span>
         </HeaderButton>
 
         <span aria-hidden="true" className="mx-1 hidden h-4 w-px bg-border md:inline-block" />
@@ -98,27 +104,30 @@ export function PracticeHeader({
           data-state={cameraOn ? 'on' : 'off'}
           onClick={onToggleCamera}
           title={cameraOn ? 'Turn camera off' : 'Turn camera on'}
+          aria-label={cameraOn ? 'Turn camera off' : 'Turn camera on'}
         >
           {cameraOn ? <Video className="h-3.5 w-3.5" /> : <VideoOff className="h-3.5 w-3.5" />}
-          {cameraOn ? 'Camera on' : 'Camera off'}
+          <span className="hidden md:inline">{cameraOn ? 'Camera on' : 'Camera off'}</span>
         </HeaderButton>
 
         <HeaderButton
           data-testid="practice-pause"
           onClick={onPause}
           title="Pause practice"
+          aria-label="Pause practice"
         >
           <Pause className="h-3.5 w-3.5" />
-          Pause
+          <span className="hidden md:inline">Pause</span>
         </HeaderButton>
 
         <HeaderButton
           data-testid="practice-exit"
           onClick={onExit}
           title="Exit to lessons"
+          aria-label="Exit to lessons"
         >
           <XIcon className="h-3.5 w-3.5" />
-          Exit
+          <span className="hidden md:inline">Exit</span>
         </HeaderButton>
       </div>
     </header>

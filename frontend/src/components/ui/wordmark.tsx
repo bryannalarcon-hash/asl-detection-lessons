@@ -5,6 +5,8 @@ import { cn } from '@/lib/utils';
 // utility class (repeating-linear-gradient background-clipped to text)
 // and the `.font-wordmark` utility class (Archivo Black) — both owned
 // by the tokens layer. Default text is "ASL PILOT" per the new brand.
+// Kept on one line (whitespace-nowrap) so it never wraps in the cramped
+// mobile nav header.
 interface WordmarkProps {
   text?: string;
   className?: string;
@@ -15,7 +17,7 @@ export function Wordmark({ text = 'ASL PILOT', className }: WordmarkProps) {
     <span
       data-testid="wordmark"
       className={cn(
-        'font-wordmark wordmark-stripe text-2xl uppercase tracking-[0.04em] inline-block',
+        'font-wordmark wordmark-stripe text-2xl uppercase tracking-[0.04em] inline-block whitespace-nowrap',
         className,
       )}
       aria-label={text}
