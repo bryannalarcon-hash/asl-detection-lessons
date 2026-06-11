@@ -37,7 +37,13 @@ export default function OnboardingCameraPage() {
   const pending = state.kind === 'requesting';
   const unsupportedMsg =
     state.kind === 'unsupported'
-      ? 'Camera not available on this device or browser. You can continue without it.'
+      ? state.reason === 'in-use'
+        ? 'Your camera is busy — another app or tab is using it. Close it and press "Turn on camera" again, or continue without it.'
+        : state.reason === 'insecure-context'
+          ? 'Camera access needs a secure connection — reload this page over https://. You can continue without it for now.'
+          : state.reason === 'no-device'
+            ? 'No camera found on this device. You can continue without it.'
+            : 'Camera not available on this device or browser. You can continue without it.'
       : null;
 
   return (

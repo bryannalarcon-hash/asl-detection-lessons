@@ -8,8 +8,26 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { BoundingBox, type BoxState } from './BoundingBox';
 import { CameraDevToolbox } from './CameraDevToolbox';
-import { useCameraPermission } from '@/hooks/useCameraPermission';
+import {
+  useCameraPermission,
+  type UnsupportedReason,
+} from '@/hooks/useCameraPermission';
 import { cn } from '@/lib/utils';
+
+/** Per-cause copy for the unsupported state — tells the user the actual
+ * problem and what fixes it, instead of a blanket "not available". */
+const UNSUPPORTED_COPY: Record<UnsupportedReason, string> = {
+  'in-use':
+    'Your camera is busy — another app or browser tab is using it. Close it (video calls, OBS, another practice tab) and retry.',
+  'insecure-context':
+    'Camera access needs a secure connection. Reload this page over https:// — browsers hide the camera on plain http.',
+  'no-device':
+    'No camera found. Plug in a webcam or enable your built-in camera, then retry.',
+  'no-api':
+    'This browser does not expose a camera API. Try a current Firefox, Chrome, or Safari.',
+  unknown:
+    'The camera could not be started. Check that no other app is using it, then retry.',
+};
 
 interface CameraPanelProps {
   boxState: BoxState;
@@ -143,12 +161,22 @@ export function CameraPanel({
         ) : state.kind === 'unsupported' ? (
           <div
             data-testid="camera-unsupported"
+            data-camera-reason={state.reason}
             className="flex h-full w-full items-center justify-center bg-bg-deep p-6 text-center text-sm text-fg-muted"
           >
-            <p className="max-w-sm">
-              Camera not available on this device or browser. Try Chrome or Safari on a
-              computer with a built-in or USB camera.
-            </p>
+            <div className="max-w-sm space-y-3">
+              <p>{UNSUPPORTED_COPY[state.reason]}</p>
+              {state.reason !== 'insecure-context' && state.reason !== 'no-api' && (
+                <button
+                  type="button"
+                  data-testid="camera-retry"
+                  onClick={() => void request()}
+                  className="inline-flex items-center justify-center rounded border border-accent/60 bg-accent/10 px-3 py-1 text-xs font-medium text-accent transition-colors hover:bg-accent/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-bg"
+                >
+                  Retry camera
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           <video

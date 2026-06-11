@@ -8,20 +8,39 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { isDevToolsEnabled } from '@/lib/env';
 
 /**
+ * Why a request landed in `unsupported`. Drives per-cause messaging + retry:
+ *
+ * - `in-use`            camera held by another app/tab (NotReadableError /
+ *                       AbortError) — retryable once the other user releases it
+ * - `insecure-context`  page served over http:// — browsers hide the camera
+ *                       API entirely outside secure contexts
+ * - `no-device`         no camera attached (NotFoundError)
+ * - `no-api`            mediaDevices missing despite a secure context
+ * - `unknown`           anything else
+ */
+export type UnsupportedReason =
+  | 'in-use'
+  | 'insecure-context'
+  | 'no-device'
+  | 'no-api'
+  | 'unknown';
+
+/**
  * Terminal-ish states for the camera-permission state machine.
  *
  * - `idle`        not yet requested in this mount
  * - `requesting`  `getUserMedia` is in flight
  * - `granted`     stream is live (real or dev-forced fake stream)
  * - `denied`      user/browser refused (`NotAllowedError`)
- * - `unsupported` no API, no device, or any other unrecoverable error
+ * - `unsupported` no API, no device, or any other unrecoverable error;
+ *                 `reason` says which so the UI can offer a useful next step
  */
 export type CameraState =
   | { kind: 'idle' }
   | { kind: 'requesting' }
   | { kind: 'granted'; stream: MediaStream }
   | { kind: 'denied' }
-  | { kind: 'unsupported' };
+  | { kind: 'unsupported'; reason: UnsupportedReason };
 
 interface UseCameraPermissionOptions {
   /** Override the default `{video:{640x480}, audio:false}` constraints. */
@@ -144,12 +163,39 @@ export function useCameraPermission(
 
     if (!navigator.mediaDevices?.getUserMedia) {
       inFlightRef.current = false;
-      if (!cancelledRef.current) setState({ kind: 'unsupported' });
+      if (!cancelledRef.current) {
+        // Browsers expose mediaDevices only in secure contexts, so a missing
+        // API on plain http:// means the page needs HTTPS, not new hardware.
+        const insecure =
+          typeof window !== 'undefined' && window.isSecureContext === false;
+        setState({
+          kind: 'unsupported',
+          reason: insecure ? 'insecure-context' : 'no-api',
+        });
+      }
       return;
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (firstErr: unknown) {
+        const firstName = (firstErr as { name?: string })?.name ?? '';
+        // Sized constraints can overconstrain some cameras even though bare
+        // `{video: true}` works — fall back before giving up.
+        if (
+          firstName === 'OverconstrainedError' ||
+          firstName === 'ConstraintNotSatisfiedError'
+        ) {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          });
+        } else {
+          throw firstErr;
+        }
+      }
       if (cancelledRef.current) {
         stream.getTracks().forEach((t) => t.stop());
         return;
@@ -162,11 +208,21 @@ export function useCameraPermission(
       if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
         setState({ kind: 'denied' });
       } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
-        setState({ kind: 'unsupported' });
+        setState({ kind: 'unsupported', reason: 'no-device' });
+      } else if (
+        name === 'NotReadableError' ||
+        name === 'TrackStartError' ||
+        name === 'AbortError'
+      ) {
+        // The device exists but couldn't start — almost always another
+        // app/tab holding the camera. Retryable once it's released.
+        // eslint-disable-next-line no-console
+        console.warn('[useCameraPermission] camera busy:', err);
+        setState({ kind: 'unsupported', reason: 'in-use' });
       } else {
         // eslint-disable-next-line no-console
         console.warn('[useCameraPermission] getUserMedia failed:', err);
-        setState({ kind: 'unsupported' });
+        setState({ kind: 'unsupported', reason: 'unknown' });
       }
     } finally {
       inFlightRef.current = false;
@@ -200,7 +256,7 @@ export function useCameraPermission(
         return;
       }
       if (s === 'unsupported') {
-        setState({ kind: 'unsupported' });
+        setState({ kind: 'unsupported', reason: 'unknown' });
         return;
       }
       // 'granted' → synthesize a fake stream.
@@ -210,7 +266,7 @@ export function useCameraPermission(
         console.warn(
           '[useCameraPermission] forceState("granted") unavailable: canvas.captureStream not supported.'
         );
-        setState({ kind: 'unsupported' });
+        setState({ kind: 'unsupported', reason: 'no-api' });
         return;
       }
       streamRef.current = built.stream;

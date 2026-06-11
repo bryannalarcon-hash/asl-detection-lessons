@@ -17,6 +17,20 @@ import seedAssetsRoutes from './routes/seed-assets';
 
 const app = new Hono();
 
+// Behind the deploy proxy, plain-http requests carry x-forwarded-proto: http.
+// Camera access (getUserMedia) only exists in secure contexts, so http://
+// visitors would see "camera unsupported" with working hardware. Redirect
+// them to https before anything else. No-op locally where the header is absent.
+app.use('*', async (c, next) => {
+  const proto = c.req.header('x-forwarded-proto');
+  if (proto === 'http') {
+    const url = new URL(c.req.url);
+    url.protocol = 'https:';
+    return c.redirect(url.toString(), 301);
+  }
+  await next();
+});
+
 app.use('/api/*', corsMiddleware);
 
 app.route('/api/health', healthRoutes);
